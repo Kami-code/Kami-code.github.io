@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="description" content="Oasis2200">
+    <meta name="image" content="cover.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+<!--    <link rel="icon" type="image/x-icon" href="media/roboagent.png" />-->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"
+        integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <title>Oasis 2200: An Online Multiplayer Battle Game
+    </title>
+
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="cover.png" />
+    <meta property="og:image:type" content="image/jpg">
+    <meta property="og:title" content="Oasis2200" />
+    <meta property="og:description"
+        content="An Online Multiplayer Battle Game" />
+
+    <!--TWITTER-->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Oasis2200" />
+    <meta name="twitter:description"
+        content="An Online Multiplayer Battle Game" />
+
+    <link rel="stylesheet" href="index.css">
+    <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css'>
+    <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Raleway" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@100&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@100&family=Source+Sans+3:wght@300;400&display=swap"
+        rel="stylesheet">
+
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { window.dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', 'UA-44241506-1');
+    </script>
+
+    <link rel="stylesheet" href="./static/css/bulma.min.css">
+    <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+    <link rel="stylesheet" href="./static/css/index.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="./static/js/bulma-carousel.min.js"></script>
+    <script src="./static/js/bulma-carousel.js"></script>
+    <script src="./static/js/index.js"></script>
+    <style>
+        /* 为常规内容保持原有的最大宽度 */
+        .container.is-max-desktop {
+            max-width: 960px;
+            margin: 0 auto;
+        }
+
+        /* 创建一个更宽的容器用于 Qualitative Results 章节 */
+        .wide-section {
+            width: 100%;
+            background-color: #fff;  /* 保持背景色一致 */
+        }
+
+        .wide-section .wide-container {
+            max-width: 1300px;  /* 显著大于默认宽度 */
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* 调整视频网格和卡片的布局 */
+        .results-carousel .card {
+            margin: 0 0.5rem;
+            height: 100%;
+        }
+    </style>
+</head>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const videoElement = document.getElementById('bg-video');
+
+        // When the video metadata is loaded
+        videoElement.addEventListener('loadedmetadata', function () {
+            videoElement.style.opacity = 1.0;
+        });
+    });
+
+    window.addEventListener("scroll", function () {
+        let imageDiv = document.querySelector('.full-page-image');
+        const videoElement = document.getElementById('bg-video');
+        if (window.scrollY > 75) {
+            videoElement.style.opacity = 0;
+        }
+        // Check if page is scrolled
+        if (window.scrollY > 50) { // You can adjust this value based on your requirement
+            imageDiv.classList.add('banner-state');
+            imageDiv.classList.add('ncont');
+            imageDiv.style.backgroundImage = `url(media/small_banner.png)`;
+        };
+    });
+
+    function copyToClipboard(element) {
+        var $temp = $("<input>");
+        $("body").append($temp);
+        $temp.val($(element).text()).select();
+        document.execCommand("copy");
+        $temp.remove();
+    }
+
+
+</script>
+
+
+<div class="content is-centered has-text-centered">
+    <section class="hero">
+        <div class="hero-body">
+            <div class="container is-max-desktop">
+                <div class="columns is-centered">
+                    <div class="column has-text-centered">
+                        <h2 class="title is-1 publication-title">
+                            <strong>Oasis 2200</strong>
+                        </h2>
+                        <h2 class="subtitle" style="font-family: 'Source Sans 3', sans-serif; font-weight: 300;">
+                            <strong>
+                                An Online Multiplayer Battle Game
+                            </strong>
+                        </h2>
+                        <h6 class="subtitle" style="font-family: 'Source Sans 3', sans-serif; font-weight: 50;">
+                            <!-- <h2 style="font-family: 'Poppins', sans-serif; font-weight: 100;"> -->
+<!--                                <strong style="color: red;">-->
+<!--                                    Accepted at <a href="https://2024.ieee-icra.org/" style="color: red;">2024 IEEE International Conference on-->
+<!--                                    Robotics and Automation</a>-->
+<!--                                </strong>-->
+                        </h6>
+
+                          <div class="is-size-5 publication-authors">
+                            <span class="author-block">
+                              <a href="https://chenbao.tech">Chen Bao</a><sup>1*</sup>,</span>
+                            <span class="author-block">
+                              <a href="https://jerryxu.net/">Boyang Zheng</a><sup>1*</sup>,</span>
+                            <span class="author-block">
+                              <a href="https://xiaolonw.github.io/">Zihong Lin</a><sup>1*</sup>
+                            </span>
+                            <span class="author-block">
+                              <a href="https://www.cs.cmu.edu/~abhinavg/">Chen Liang</a><sup>1*</sup>
+                            </span>
+                          </div>
+
+                      <div class="is-size-5 publication-authors">
+                        <span class="author-block"><sup>1</sup>Shanghai Jiao Tong University,</span>
+                        <br>
+                      </div>
+                        <div class="is-size-6 publication-authors">
+                            <span style="font-size: 0.9em;">*Equal Contribution</span><br>
+                        </div>
+                        <div class="column has-text-centered">
+                            <div class="taptap-links">
+                                <span class="link-block">
+                                    <a href="https://www.taptap.cn/app/221746"
+                                        class="external-link button is-normal is-rounded is-dark" target="_blank">
+                                        <span class="icon">
+                                            <i class="fa fa-gamepad" style="font-size:24px"></i>
+                                        </span>
+                                        <span>TapTap</span>
+                                    </a>
+                                </span>
+                                <span class="link-block">
+                                    <a href="./Oasis2200v3.1.apk"
+                                        class="external-link button is-normal is-rounded is-dark" target="_blank">
+                                        <span class="icon">
+                                            <i class="fa fa-download" style="font-size:24px"></i>
+                                        </span>
+                                        <span>APK download</span>
+                                    </a>
+                                </span>
+
+                                <span class="link-block">
+                                    <a href="https://github.com/Okabe-Rintarou-0/Oasis-2200-Backend"
+                                        class="external-link button is-normal is-rounded is-dark" target="_blank">
+                                        <span class="icon">
+                                            <i class="fa fa-github" style="font-size:24px"></i>
+                                        </span>
+                                        <span>Code</span>
+                                    </a>
+                                </span>
+
+                            </div>
+                        </div>
+
+                        </div>
+<!--                            <div class="is-size-8 publication-authors">-->
+<!--                                <span class="author-block">-->
+<!--                                    *equal contribution, Carnegie Mellon University and University of California San Diego-->
+<!--                                </span>-->
+<!--                            </div>-->
+
+
+                    </div>
+                </div>
+            </div>
+    </section>
+</div>
+
+<div class="container is-max-desktop">
+
+    <img src="teaser.png">
+    <p style="text-align: center;">
+        By the year 2200, due to humanity's excessive exploitation and production, irreversible damage had been inflicted upon Earth's environment. Meanwhile, nuclear contamination from the Fifth World War had left people without their homes... The displaced survivors must put aside their prejudices, conflicts, and differences to unite together, establish a self-sufficient shelter, and help other survivors as they strive to survive together.
+    </p>
+
+    <br>
+    <div class="content is-centered has-text-centered">
+        <div class="column is-centered is-vcentered has-text-centered">
+            <video autoplay="" muted="" loop="" playsinline="" width="100%" controls>
+                <source src="./output.mp4" type="video/mp4">
+            </video>
+        </div>
+        Official Gameplay Footage.
+    </div>
+
+
+</div>
+
+
+<footer class="footer">
+    <div class="container">
+        <div class="columns is-centered">
+            <div class="column is-8">
+                <div class="content">
+                    <p>
+                        © 2022-2024 All rights reserved. Final interpretation belongs to Oasis 2200 Official.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</footer>
+</body>
+
+</html>
