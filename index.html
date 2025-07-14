@@ -36,20 +36,21 @@
             </div>
             <!-- social network icons -->
             <div class="social">
-              <a href="https://github.com/Kami-code" target="_blank">
-                <span class="fab fa-github fa-2x" style="display:inline; text-decoration: none"></span>
+              <a href="https://github.com/Kami-code" target="_blank" class="social-link">
+                <span class="link-text">GitHub</span>
+                <span class="fab fa-github fa-2x icon-fallback" style="display:none; text-decoration: none"></span>
               </a>
-              <a href="https://scholar.google.com/citations?user=HOngPZAAAAAJ" target="_blank">
-                <span class="fab fa-google fa-2x" style="display:inline; text-decoration: none"></span>
+              <a href="https://scholar.google.com/citations?user=HOngPZAAAAAJ" target="_blank" class="social-link">
+                <span class="link-text">Scholar</span>
+                <span class="fab fa-google fa-2x icon-fallback" style="display:none; text-decoration: none"></span>
               </a>
-              <a href="https://www.linkedin.com/in/chenbao1" target="_blank">
-                <span class="fab fa-linkedin fa-2x" style="display:inline; text-decoration: none"></span>
+              <a href="https://www.linkedin.com/in/chenbao1" target="_blank" class="social-link">
+                <span class="link-text">LinkedIn</span>
+                <span class="fab fa-linkedin fa-2x icon-fallback" style="display:none; text-decoration: none"></span>
               </a>
-              <!--<a href="https://www.facebook.com/???????" target="_blank">-->
-                <!--<span class="fab fa-facebook fa-2x" style="display:inline; text-decoration: none"></span>-->
-              <!--</a>-->
-              <a href="https://twitter.com/chenbao191541" target="_blank">
-                <i class="fab fa-twitter fa-2x" style="display:inline; text-decoration: none"></i>
+              <a href="https://twitter.com/chenbao191541" target="_blank" class="social-link">
+                <span class="link-text">Twitter</span>
+                <i class="fab fa-twitter fa-2x icon-fallback" style="display:none; text-decoration: none"></i>
               </a>
             </div>
 
@@ -74,6 +75,7 @@
               News
             </h3>
             <ul>
+              <li><span>[2025/03] 🎉 <a href="https://github.com/haosulab/ManiSkill">ManiSkill3</a> is accepted at RSS'25 and as an oral presentation at the ICLR Robot Learning Workshop.</span></li>
               <li><span>[2024/05] 🎉 <a href="https://github.com/haosulab/ManiSkill">ManiSkill3</a> Beta has been released! State-of-the-art fully open-source robotics simulation with the fastest parallel visual simulation, 10-1000x faster than other simulators.</span></li>
               <li><span>[2023/11] 🎉 One paper wins the outstanding paper award at the Language Robotics workshop CoRL 2023 and gets accepted to ICLR 2024 as Spotlight. </span></li>
               <li><span>[2023/08] 🎉 I join <a href="https://www.ri.cmu.edu/">CMU Robotics Institute</a> as a graduate student.</span></li>
@@ -83,9 +85,9 @@
             </ul>
 
             <h3 id="intro">Intro</h3>
-<p>I recently graduated with a Master's degree from the Robotics Institute at Carnegie Mellon University, where I worked with Prof. <a href="http://www.cs.cmu.edu/~abhinavg/" target="_blank" style="text-decoration: underline;">Abhinav Gupta</a> on foundation model. During my graduate studies, I also collaborated with Prof. <a href="https://xiaolonw.github.io/index.html" target="_blank" style="text-decoration: underline;">Xiaolong Wang</a> at UC San Diego, focusing on robotic manipulation and computer vision. Prior to CMU, I conducted research at MVIG Lab, Shanghai Jiao Tong University, under the supervision of Prof. <a href="https://www.mvig.org/" target="_blank" style="text-decoration: underline;">Cewu Lu</a> and Dr. <a href="https://wenqiangx.github.io/" target="_blank" style="text-decoration: underline;">Wenqiang Xu</a>.</p>
+<p>I recently graduated with a Master's degree from the Robotics Institute at Carnegie Mellon University, where I worked with Prof. <a href="http://www.cs.cmu.edu/~abhinavg/" target="_blank" style="text-decoration: underline;">Abhinav Gupta</a> on foundation models. I previously worked at <a href="https://www.skild.ai/" target="_blank" style="text-decoration: underline;">Skild AI</a> with Prof. <a href="https://www.cs.cmu.edu/~dpathak/" target="_blank" style="text-decoration: underline;">Deepak Pathak</a>. During my graduate studies, I also collaborated with Prof. <a href="https://xiaolonw.github.io/index.html" target="_blank" style="text-decoration: underline;">Xiaolong Wang</a> at UC San Diego, focusing on robotic manipulation and computer vision. Prior to CMU, I conducted research at MVIG Lab, Shanghai Jiao Tong University, under the supervision of Prof. <a href="https://www.mvig.org/" target="_blank" style="text-decoration: underline;">Cewu Lu</a> and Dr. <a href="https://wenqiangx.github.io/" target="_blank" style="text-decoration: underline;">Wenqiang Xu</a>.</p>
 <p>
-   I am currently seeking PhD positions for Fall 2025. My research interests include generative AI for robotic perception and manipulation, reinforcement learning and imitation learning, visual representation learning using Internet-scale data.
+   I received offers from Princeton University and University of Illinois at Urbana-Champaign for Fall 2025 PhD programs, but decided to pursue opportunities in industry. My research interests include generative AI for robotic perception and manipulation, reinforcement learning and imitation learning, visual representation learning using Internet-scale data.
 </p>
             <h3 id="research">Research</h3>
 
@@ -341,6 +343,56 @@
     });
   </script>
   <script src="https://kit.fontawesome.com/970bf0f05d.js" crossorigin="anonymous"></script>
+  <style>
+    .social-link {
+      display: block;
+      margin-bottom: 8px;
+      text-decoration: none;
+      color: #3273dc;
+    }
+    .social-link:hover {
+      text-decoration: underline;
+    }
+    .link-text {
+      font-weight: 500;
+    }
+  </style>
+  <script>
+    // Show icons when FontAwesome loads
+    document.addEventListener('DOMContentLoaded', function() {
+      // Check if FontAwesome is loaded
+      function checkFontAwesome() {
+        var testIcon = document.createElement('i');
+        testIcon.className = 'fab fa-github';
+        testIcon.style.visibility = 'hidden';
+        testIcon.style.position = 'absolute';
+        document.body.appendChild(testIcon);
+        
+        var computed = window.getComputedStyle(testIcon, ':before');
+        var isLoaded = computed.content !== 'none' && computed.content !== '';
+        
+        document.body.removeChild(testIcon);
+        return isLoaded;
+      }
+      
+      function switchToIcons() {
+        if (checkFontAwesome()) {
+          document.querySelectorAll('.link-text').forEach(function(text) {
+            text.style.display = 'none';
+          });
+          document.querySelectorAll('.icon-fallback').forEach(function(icon) {
+            icon.style.display = 'inline';
+          });
+        } else {
+          // Retry after a short delay
+          setTimeout(switchToIcons, 100);
+        }
+      }
+      
+      // Try to switch to icons
+      switchToIcons();
+    });
+  </script>
 </body>
 
 </html>
