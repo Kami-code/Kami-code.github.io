@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>鲍辰</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
+</head>
+
+<body>
+  <div class="container">
+    <div class="avatar">
+      <img src="images/sfphoto.jpg" alt="Chen Bao">
+    </div>
+    
+    <h1>Chen Bao</h1>
+    
+    <div class="videos">
+      <h2>My Vlog</h2>
+      <div id="video-grid" class="video-grid">
+        <!-- 视频将通过JavaScript动态加载 -->
+      </div>
+    </div>
+    
+    <div class="lang-switch">
+      <a href="index.html">Main Page</a>
+    </div>
+  </div>
+  
+  <!-- 视频播放模态框 -->
+  <div id="video-modal" class="video-modal" onclick="closeVideoModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <span class="close-button" onclick="closeVideoModal()">&times;</span>
+      <div id="video-player"></div>
+    </div>
+  </div>
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Noto Sans SC', sans-serif;
+      background: #f8f9fa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      color: #333;
+    }
+    
+    .container {
+      text-align: center;
+      max-width: 1200px;
+      padding: 40px 20px;
+    }
+    
+    .avatar {
+      margin-bottom: 30px;
+    }
+    
+    .avatar img {
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      object-fit: cover;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    
+    h1 {
+      font-size: 2em;
+      font-weight: 400;
+      margin-bottom: 20px;
+      color: #2c3e50;
+    }
+    
+    .quote {
+      font-size: 1.1em;
+      color: #666;
+      font-style: italic;
+      margin-bottom: 40px;
+      line-height: 1.5;
+    }
+    
+    .lang-switch {
+      margin-top: 40px;
+    }
+    
+    .lang-switch a {
+      color: #3273dc;
+      text-decoration: none;
+      font-size: 0.9em;
+    }
+    
+    .lang-switch a:hover {
+      text-decoration: underline;
+    }
+    
+    .videos {
+      margin: 40px 0;
+    }
+    
+    .videos h2 {
+      font-size: 1.4em;
+      color: #2c3e50;
+      margin-bottom: 25px;
+      font-weight: 400;
+    }
+    
+    .video-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, 80px);
+      grid-auto-rows: 60px;
+      gap: 12px;
+      justify-content: center;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .video-item {
+      cursor: pointer;
+      transition: transform 0.2s ease;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    /* 横屏视频：宽4格，高3格（16:9缩略图+标题空间） */
+    .video-item.landscape {
+      grid-column: span 4;
+      grid-row: span 3;
+    }
+    
+    /* 竖屏视频：宽2格，高6格（9:16缩略图+标题空间） */
+    .video-item.portrait {
+      grid-column: span 2;
+      grid-row: span 6;
+    }
+    
+    .video-item:hover {
+      transform: translateY(-2px);
+    }
+    
+    .video-item a {
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    
+    .video-thumbnail {
+      position: relative;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      flex: 1;
+    }
+    
+    .landscape .video-thumbnail {
+      aspect-ratio: 16/9;
+    }
+    
+    .portrait .video-thumbnail {
+      aspect-ratio: 9/16;
+    }
+    
+    .video-info {
+      padding: 8px 4px 0 4px;
+      flex-shrink: 0;
+    }
+    
+    .video-info h3 {
+      font-size: 0.85em;
+      font-weight: 500;
+      margin: 0 0 2px 0;
+      color: #333;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    .video-info p {
+      font-size: 0.75em;
+      color: #666;
+      margin: 0;
+    }
+    
+    .video-thumbnail img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    .play-button {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.8);
+      color: white;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    .video-thumbnail:hover .play-button {
+      opacity: 1;
+    }
+    
+    .video-thumbnail.disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    
+    .video-thumbnail.disabled:hover {
+      transform: none;
+    }
+    
+    .disabled-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      text-align: center;
+    }
+    
+    .disabled-overlay span {
+      font-size: 2em;
+      margin-bottom: 8px;
+    }
+    
+    .disabled-overlay p {
+      font-size: 0.9em;
+      margin: 0;
+    }
+    
+    .preview-button {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.8);
+      color: white;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    .video-thumbnail:hover .preview-button {
+      opacity: 1;
+    }
+    
+    .placeholder-thumb {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .placeholder-content {
+      text-align: center;
+      color: white;
+    }
+    
+    .placeholder-content span {
+      font-size: 2.5em;
+      display: block;
+      margin-bottom: 8px;
+    }
+    
+    .placeholder-content p {
+      font-size: 0.9em;
+      margin: 0;
+      opacity: 0.9;
+    }
+    
+    /* 视频播放模态框 */
+    .video-modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.8);
+      animation: fadeIn 0.3s ease;
+      overflow-y: auto;
+    }
+    
+    .modal-content {
+      position: relative;
+      margin: 5% auto;
+      width: 90%;
+      max-width: 900px;
+      background: #000;
+      border-radius: 8px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    
+    .close-button {
+      position: absolute;
+      top: 10px;
+      right: 20px;
+      font-size: 30px;
+      color: white;
+      cursor: pointer;
+      z-index: 1001;
+      background: rgba(0, 0, 0, 0.5);
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .close-button:hover {
+      background: rgba(0, 0, 0, 0.8);
+    }
+    
+    #video-player iframe {
+      width: 100%;
+      height: 500px;
+      border: none;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @media (max-width: 768px) {
+      .modal-content {
+        width: 95%;
+        margin: 10% auto;
+      }
+      
+      #video-player iframe {
+        height: 250px;
+      }
+    }
+    
+  </style>
+  
+  <script>
+    // 视频配置 - 你可以在这里添加或修改视频
+    const videoConfig = {
+      videos: [
+        {
+          id: "1",
+          title: "封校日记 ｜ 2022",
+          date: "2022年4月",
+          ratio: "16:9",
+          type: "preview",
+          url: "https://youtu.be/3AWZYh34ETQ",
+          thumbnail: "https://img.youtube.com/vi/3AWZYh34ETQ/maxresdefault.jpg",
+          description: "This video serves as a record of my time during campus lockdown, March-June 2022, Shanghai Jiao Tong University.",
+          duration: "7:38",
+          tags: ["日常", "上海", "校园生活"],
+          buttonEmoji: "🎬",
+          buttonText: "在YouTube观看"
+        },
+        {
+          id: "2",
+          title: "毕业vlog | 在交大毕业前的最后72小时",
+          date: "2023年6月",
+          ratio: "16:9",
+          type: "preview",
+          url: "https://www.xiaohongshu.com/discovery/item/64b574200000000023035e44?source=webshare&xhsshare=pc_web&xsec_token=AB9E_WhJSRQ-uzjhduSomqqmzmG7s3Chglup8jsQm1CPE=&xsec_source=pc_share",
+          thumbnail: "images/1.webp",
+          description: "离校前想要留下些什么 于是有了此片\n没有配乐也没有剧本\n欢迎和我度过离校前最后的72小时\n重温每个人的青春\n毕业快乐！",
+          duration: "13:20",
+          tags: ["日常", "上海", "校园生活"],
+          buttonEmoji: "📕",
+          buttonText: "在小红书查看"
+        },
+        {
+          id: "3",
+          title: " ",
+          date: "即将上传",
+          ratio: "16:9",
+          type: "placeholder",
+          emoji: " ",
+          description: "",
+          duration: "12:18",
+        },
+      ]
+    };
+
+    // 渲染视频卡片
+    function renderVideos(videos) {
+      const videoGrid = document.getElementById('video-grid');
+      videoGrid.innerHTML = '';
+
+      videos.forEach(video => {
+        const videoItem = document.createElement('div');
+        const ratioClass = video.ratio === '16:9' ? 'landscape' : 'portrait';
+        videoItem.className = `video-item ${ratioClass}`;
+
+        if (video.type === 'youtube') {
+          if (video.canEmbed === false) {
+            // 不能嵌入的视频，不可点击
+            videoItem.innerHTML = `
+              <div class="video-thumbnail disabled">
+                <img src="${video.thumbnail}" alt="${video.title}">
+                <div class="disabled-overlay">
+                  <span>🚫</span>
+                  <p>暂不支持播放</p>
+                </div>
+              </div>
+              <div class="video-info">
+                <h3>${video.title}</h3>
+                <p>${video.date} • 暂不可播放</p>
+              </div>
+            `;
+          } else {
+            // 可以嵌入的视频，正常播放
+            videoItem.innerHTML = `
+              <div class="video-thumbnail" onclick="playVideo('${video.id}', '${getYouTubeId(video.url)}', '${video.url}')">
+                <img src="${video.thumbnail}" alt="${video.title}">
+                <div class="play-button">▶</div>
+              </div>
+              <div class="video-info">
+                <h3>${video.title}</h3>
+                <p>${video.date}</p>
+              </div>
+            `;
+          }
+        } else if (video.type === 'preview') {
+          // 预览模式：显示缩略图和描述，点击查看详情
+          videoItem.innerHTML = `
+            <div class="video-thumbnail" onclick="showVideoPreview('${video.id}')">
+              <img src="${video.thumbnail}" alt="${video.title}">
+              <div class="preview-button">👁️</div>
+            </div>
+            <div class="video-info">
+              <h3>${video.title}</h3>
+              <p>${video.date}</p>
+            </div>
+          `;
+        } else {
+          videoItem.innerHTML = `
+            <div class="video-thumbnail placeholder-thumb">
+              <div class="placeholder-content">
+                <span>${video.emoji}</span>
+                <p>${video.description}</p>
+              </div>
+            </div>
+            <div class="video-info">
+              <h3>${video.title}</h3>
+              <p>${video.date}</p>
+            </div>
+          `;
+        }
+
+        videoGrid.appendChild(videoItem);
+      });
+    }
+
+    // 从YouTube URL提取视频ID
+    function getYouTubeId(url) {
+      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+      const match = url.match(regExp);
+      return (match && match[2].length === 11) ? match[2] : null;
+    }
+
+    // 播放视频
+    function playVideo(videoId, youtubeId, fallbackUrl) {
+      console.log('调试信息:', { videoId, youtubeId, fallbackUrl });
+      
+      const modal = document.getElementById('video-modal');
+      const player = document.getElementById('video-player');
+      
+      // 创建测试iframe并监听错误
+      player.innerHTML = `
+        <div style="text-align: center; color: white; padding: 20px;">
+          <p>正在加载视频...</p>
+          <button onclick="testEmbedUrl()" style="margin: 10px; padding: 8px 16px; background: #1976d2; color: white; border: none; border-radius: 4px;">
+            测试嵌入URL
+          </button>
+          <button onclick="testDirectUrl()" style="margin: 10px; padding: 8px 16px; background: #d32f2f; color: white; border: none; border-radius: 4px;">
+            测试直接URL
+          </button>
+        </div>
+        <iframe 
+          id="test-iframe"
+          width="100%" 
+          height="400" 
+          src="https://www.youtube.com/embed/${youtubeId}" 
+          title="YouTube video player" 
+          frameborder="0" 
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+          referrerpolicy="strict-origin-when-cross-origin" 
+          allowfullscreen
+          onload="console.log('iframe加载成功')"
+          onerror="console.log('iframe加载失败')">
+        </iframe>
+      `;
+      
+      modal.style.display = 'block';
+      document.body.style.overflow = 'hidden';
+      
+      console.log('测试URL:', `https://www.youtube.com/embed/${youtubeId}`);
+      
+      // 5秒后检查iframe状态
+      setTimeout(() => {
+        const iframe = document.getElementById('test-iframe');
+        try {
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+          console.log('iframe内容检查:', iframeDoc.title);
+        } catch (e) {
+          console.log('iframe访问被阻止:', e.message);
+        }
+      }, 5000);
+    }
+    
+    // 测试函数
+    function testEmbedUrl() {
+      window.open('https://www.youtube.com/embed/3AWZYh34ETQ', '_blank');
+    }
+    
+    function testDirectUrl() {
+      window.open('https://youtu.be/3AWZYh34ETQ', '_blank');
+    }
+    
+    // 显示视频预览
+    function showVideoPreview(videoId) {
+      const video = videoConfig.videos.find(v => v.id === videoId);
+      if (!video) return;
+      
+      const modal = document.getElementById('video-modal');
+      const player = document.getElementById('video-player');
+      
+      const tagsHtml = video.tags 
+        ? video.tags.map(tag => `<span style="background: #444; padding: 4px 8px; border-radius: 12px; font-size: 12px; margin-right: 6px;">${tag}</span>`).join('')
+        : '';
+      const buttonEmoji = video.buttonEmoji || '🔗';
+      const buttonText = video.buttonText || '打开链接查看';
+      
+      player.innerHTML = `
+        <div style="color: white; padding: 40px; text-align: center; max-width: 600px; margin: 0 auto;">
+          <img src="${video.thumbnail}" style="max-width: 100%; max-height: 300px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+          <h2 style="margin-bottom: 8px; font-size: 1.8em;">${video.title}</h2>
+          <div style="display: flex; justify-content: center; align-items: center; gap: 20px; margin-bottom: 20px; color: #ccc; font-size: 14px;">
+            <span>📅 ${video.date}</span>
+            ${video.duration ? `<span>⏱️ ${video.duration}</span>` : ''}
+          </div>
+          ${tagsHtml ? `<div style="margin-bottom: 20px;">${tagsHtml}</div>` : ''}
+          <p style="line-height: 1.6; margin-bottom: 30px; text-align: left; background: rgba(255,255,255,0.1); padding: 20px; border-radius: 8px;">${video.description || '暂无描述'}</p>
+          <button onclick="window.open('${video.url}', '_blank')" 
+                  style="background: #ff0000; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 16px; cursor: pointer; margin-right: 10px; transition: background 0.3s;">
+            ${buttonEmoji} ${buttonText}
+          </button>
+          <button onclick="closeVideoModal()" 
+                  style="background: #666; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 16px; cursor: pointer; transition: background 0.3s;">
+            关闭
+          </button>
+        </div>
+      `;
+      
+      modal.style.display = 'block';
+      document.body.style.overflow = 'hidden';
+    }
+
+    // 关闭视频模态框
+    function closeVideoModal() {
+      const modal = document.getElementById('video-modal');
+      const player = document.getElementById('video-player');
+      
+      modal.style.display = 'none';
+      player.innerHTML = ''; // 停止播放
+      document.body.style.overflow = 'auto'; // 恢复背景滚动
+    }
+
+    // ESC键关闭模态框
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape') {
+        closeVideoModal();
+      }
+    });
+
+    // 页面加载完成后执行
+    document.addEventListener('DOMContentLoaded', function() {
+      // 渲染视频
+      renderVideos(videoConfig.videos);
+    });
+  </script>
+</body>
+
+</html>

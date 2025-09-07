@@ -1,0 +1,14 @@
+{
+  "videos": [
+    {
+      "id": "1",
+      "title": "VLOG: Spring 2022 @SJTU",
+      "date": "2022年4月",
+      "ratio": "16:9",
+      "type": "preview",
+      "url": "https://youtu.be/3AWZYh34ETQ",
+      "thumbnail": "https://img.youtube.com/vi/3AWZYh34ETQ/maxresdefault.jpg",
+      "description": "This video serves as a record of my time during campus lockdown, March-June 2022, Shanghai Jiao Tong University."
+    }
+  ]
+}
