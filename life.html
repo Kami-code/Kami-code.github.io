@@ -369,26 +369,14 @@
       /* Ensure video grid doesn't clip on small screens */
       .videos {
         overflow-x: auto;
-        overflow-y: hidden;
         -webkit-overflow-scrolling: touch;
-        touch-action: pan-x;
-        width: 100vw;
-        margin-left: calc(50% - 50vw);
-        padding: 0 12px;
-        scroll-snap-type: x mandatory;
       }
       .video-grid {
-        display: flex;
-        flex-wrap: nowrap;
-        gap: 12px;
-        justify-content: flex-start;
         max-width: none;
         width: max-content;
+        justify-content: flex-start;
         margin: 0; /* prevent centering offset that can clip */
       }
-      .video-item { scroll-snap-align: start; }
-      .video-item.landscape { min-width: 320px; }
-      .video-item.portrait { min-width: 160px; }
     }
     
   </style>
@@ -634,22 +622,6 @@
     document.addEventListener('DOMContentLoaded', function() {
       // 渲染视频
       renderVideos(videoConfig.videos);
-      // Ensure scroll starts at the first card on mobile
-      try {
-        const videosWrapper = document.querySelector('.videos');
-        if (videosWrapper) {
-          videosWrapper.scrollLeft = 0;
-          // In case layout shifts after images load
-          requestAnimationFrame(() => { videosWrapper.scrollLeft = 0; });
-          window.addEventListener('load', () => { videosWrapper.scrollLeft = 0; });
-          // After thumbnails load
-          const imgs = document.querySelectorAll('.video-thumbnail img');
-          imgs.forEach(img => {
-            if (img.complete) return;
-            img.addEventListener('load', () => { videosWrapper.scrollLeft = 0; });
-          });
-        }
-      } catch (e) {}
     });
   </script>
 </body>
