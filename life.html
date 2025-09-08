@@ -366,6 +366,17 @@
       #video-player iframe {
         height: 250px;
       }
+      /* Ensure video grid doesn't clip on small screens */
+      .videos {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .video-grid {
+        max-width: none;
+        width: max-content;
+        justify-content: flex-start;
+        margin: 0; /* prevent centering offset that can clip */
+      }
     }
     
   </style>
