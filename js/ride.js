@@ -359,6 +359,44 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
   const headGeo = new THREE.BoxGeometry(HW, 0.07, 0.22);
   const heads = new THREE.InstancedMesh(headGeo, headMat, NP);
   for (const m of [pillars, strips, poles, arms, heads]) { m.frustumCulled = false; m.renderOrder = -30; outside.add(m); }
+  // TWIN-TRACK GUIDEWAY. Our own beam is right above the roof and can never be seen from inside, so the line reads
+  // as 'suspended' through the parallel beam (the other direction) hung from the same T-pylons, 9.8 m out: a lit
+  // LED strip on its lower edges runs ahead above the windows, with open air under it. Segments are one pillar
+  // pitch long (joints at the pylons) and dim with distance (instance colours) so the line fades into the haze.
+  const TW = { z: 2 * PILLAR_Z, y0: 5.0, h: 1.2, w: 1.3, seg: PILLAR_PITCH, arm: 0.7 };
+  const beamGeo = new THREE.BoxGeometry(TW.seg - 0.08, TW.h, TW.w);
+  const armTGeo = new THREE.BoxGeometry(TW.arm, 0.8, -TW.z + 2 * 0.8);
+  for (const g of [beamGeo, armTGeo]) {
+    // baked light: dark concrete, the car-facing side a touch lighter, the underside washed by the LED strips
+    const pos = g.attributes.position, nor = g.attributes.normal, col = [];
+    const side = new THREE.Color('#474c5c'), far = new THREE.Color('#2a2d38'), top = new THREE.Color('#202229'), under = new THREE.Color('#255f6c');
+    for (let i = 0; i < pos.count; i++) {
+      const ny = nor.getY(i), nz = nor.getZ(i);
+      const c = ny < -0.5 ? under : ny > 0.5 ? top : nz > 0.5 ? side : far;
+      col.push(c.r, c.g, c.b);
+    }
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  }
+  const beamMat = new THREE.MeshBasicMaterial({ vertexColors: true });
+  const beams = new THREE.InstancedMesh(beamGeo, beamMat, NP);
+  const ledMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#7ff0ff').multiplyScalar(3.8), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+  const leds = new THREE.InstancedMesh(new THREE.BoxGeometry(TW.seg - 0.9, 0.1, 0.1), ledMat, NP * 3);
+  const MK = 8, MKW = 0.35;                               // underside marker lights: 8 per segment (every 3 m)
+  const mkMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#e8fbff').multiplyScalar(3.4), map: white1, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+  const mkSm = motionSmear(mkMat);
+  const markers = new THREE.InstancedMesh(new THREE.BoxGeometry(MKW, 0.05, 0.22), mkMat, NP * MK);
+  const armTMat = new THREE.MeshBasicMaterial({ vertexColors: true, map: white1, transparent: true });
+  const armTSm = motionSmear(armTMat);
+  const armsT = new THREE.InstancedMesh(armTGeo, armTMat, NP);
+  const twinCol = new THREE.Color(1, 1, 1);
+  for (let i = 0; i < NP; i++) { beams.setColorAt(i, twinCol); armsT.setColorAt(i, twinCol); for (let k = 0; k < 3; k++) leds.setColorAt(3 * i + k, twinCol); for (let k = 0; k < MK; k++) markers.setColorAt(MK * i + k, twinCol); }
+  // our own beam (z = 0) with the same lights: hidden by the roof overhead, seen ahead through the front glass
+  const beamsO = new THREE.InstancedMesh(beamGeo, beamMat, NP);
+  const ledsO = new THREE.InstancedMesh(leds.geometry, ledMat, NP * 2);
+  const markersO = new THREE.InstancedMesh(markers.geometry, mkMat, NP * MK);
+  for (let i = 0; i < NP; i++) { beamsO.setColorAt(i, twinCol); for (let k = 0; k < 2; k++) ledsO.setColorAt(2 * i + k, twinCol); for (let k = 0; k < MK; k++) markersO.setColorAt(MK * i + k, twinCol); }
+  const twinMeshes = [beams, leds, armsT, markers, beamsO, ledsO, markersO];
+  for (const m of twinMeshes) { m.frustumCulled = false; m.renderOrder = -30; outside.add(m); }
   const LAMP_TOP = 3.25;
   const tmpM = new THREE.Matrix4(), tmpS = new THREE.Vector3(1, 1, 1), tmpQ = new THREE.Quaternion(), tmpP = new THREE.Vector3();
   function placeOutside(D, v) {
@@ -366,7 +404,9 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
     // distance covered in ~0.7 frame at 60 fps; each object becomes a trapezoid of width w + sm (motionSmear)
     const sm = reduced ? 0 : Math.min(1.2, Math.abs(v) * 0.012);
     const kP = PW / (PW + sm), kS = SW / (SW + sm), kL = 0.18 / (0.18 + sm), kH = HW / (HW + sm);
-    pillarSm.set(PW, sm); stripSm.set(SW, sm, 0.12); headSm.set(HW, sm);   // strips: dimmer than energy-conserving, or the face washes cyan
+    pillarSm.set(PW, sm); stripSm.set(SW, sm, 0.12); headSm.set(HW, sm);
+    const kA = TW.arm / (TW.arm + sm), kM = MKW / (MKW + sm); armTSm.set(TW.arm, sm); mkSm.set(MKW, sm);
+    const exT = view.eye[0];   // strips: dimmer than energy-conserving, or the face washes cyan
     poleMat.opacity = Math.max(0.2, kL);
     for (let i = 0; i < NP; i++) {
       const x = PILLAR_X0 + (K0 + i) * PILLAR_PITCH - ph;
@@ -378,8 +418,30 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
       tmpS.set(1 / kL, LAMP_TOP - streetY, 1); tmpM.compose(tmpP.set(lx, streetY, LAMP_Z - 1.0), tmpQ, tmpS); poles.setMatrixAt(i, tmpM);
       tmpS.set(1 + (1 / kL - 1) * (0.18 / 0.08), 1, 1); tmpM.compose(tmpP.set(lx, LAMP_TOP, LAMP_Z - 1.0), tmpQ, tmpS); arms.setMatrixAt(i, tmpM);
       tmpS.set(1 / kH, 1, 1); tmpM.compose(tmpP.set(lx, LAMP_TOP - 0.06, LAMP_Z + 0.05), tmpQ, tmpS); heads.setMatrixAt(i, tmpM);
+      // twin beam segment between this pylon and the next, its two LED strips, and the pylon's cross-arm
+      const bx = x + TW.seg / 2, fade = Math.exp(-Math.max(0, Math.abs(bx - exT) - 40) / 160);
+      tmpS.set(1, 1, 1);
+      tmpM.compose(tmpP.set(bx, TW.y0 + TW.h / 2, TW.z), tmpQ, tmpS); beams.setMatrixAt(i, tmpM);
+      tmpM.compose(tmpP.set(bx, TW.y0 + 0.03, TW.z + TW.w / 2 - 0.02), tmpQ, tmpS); leds.setMatrixAt(3 * i, tmpM);
+      tmpM.compose(tmpP.set(bx, TW.y0 + 0.03, TW.z - TW.w / 2 + 0.02), tmpQ, tmpS); leds.setMatrixAt(3 * i + 1, tmpM);
+      tmpM.compose(tmpP.set(bx, TW.y0 + TW.h - 0.05, TW.z + TW.w / 2 + 0.01), tmpQ, tmpS); leds.setMatrixAt(3 * i + 2, tmpM);
+      tmpS.set(1 / kM, 1, 1);
+      for (let k = 0; k < MK; k++) {
+        tmpM.compose(tmpP.set(x + (k + 0.5) * (TW.seg / MK), TW.y0 - 0.03, TW.z), tmpQ, tmpS); markers.setMatrixAt(MK * i + k, tmpM);
+        tmpM.compose(tmpP.set(x + (k + 0.5) * (TW.seg / MK), TW.y0 - 0.03, 0), tmpQ, tmpS); markersO.setMatrixAt(MK * i + k, tmpM);
+        markers.setColorAt(MK * i + k, twinCol.setScalar(fade)); markersO.setColorAt(MK * i + k, twinCol);
+      }
+      tmpS.set(1, 1, 1);
+      tmpM.compose(tmpP.set(bx, TW.y0 + TW.h / 2, 0), tmpQ, tmpS); beamsO.setMatrixAt(i, tmpM);
+      tmpM.compose(tmpP.set(bx, TW.y0 + 0.03, TW.w / 2 - 0.02), tmpQ, tmpS); ledsO.setMatrixAt(2 * i, tmpM);
+      tmpM.compose(tmpP.set(bx, TW.y0 + 0.03, -TW.w / 2 + 0.02), tmpQ, tmpS); ledsO.setMatrixAt(2 * i + 1, tmpM);
+      beamsO.setColorAt(i, twinCol.setScalar(0.3 + 0.7 * fade)); ledsO.setColorAt(2 * i, twinCol.setScalar(fade)); ledsO.setColorAt(2 * i + 1, twinCol);
+      tmpS.set(1 / kA, 1, 1); tmpM.compose(tmpP.set(x, TW.y0 + TW.h + 0.4, TW.z / 2), tmpQ, tmpS); armsT.setMatrixAt(i, tmpM);
+      beams.setColorAt(i, twinCol.setScalar(0.3 + 0.7 * fade)); armsT.setColorAt(i, twinCol);
+      leds.setColorAt(3 * i, twinCol.setScalar(fade)); leds.setColorAt(3 * i + 1, twinCol.setScalar(0.55 * fade)); leds.setColorAt(3 * i + 2, twinCol.setScalar(0.35 * fade));
     }
     for (const m of [pillars, strips, poles, arms, heads]) m.instanceMatrix.needsUpdate = true;
+    for (const m of twinMeshes) { m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; }
     // the two nearest lamps sweep cool light through the interior as they pass (x relative to the eye)
     const ex = view.eye[0];
     const lampXs = [];
