@@ -1,17 +1,34 @@
-<!DOCTYPE html>
-<html>
-
+<!doctype html>
+<html lang="en" class="no-js">
 <head>
-  <meta charset="utf-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Chen Bao's Homepage</title>
-  <link href="css/bootstrap.css" rel='stylesheet' type='text/css' />
-  <!--<link rel="shortcut icon" href="../images/fav_icon.png" type="image/x-icon">-->
-  <link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet">
-  <!-- Bulma Version 0.7.5-->
-  <link rel="stylesheet" href="https://unpkg.com/bulma@0.7.5/css/bulma.min.css" />
-  <link href='css/style.css' rel='stylesheet' type='text/css'>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chen Bao's Homepage</title>
+<meta name="theme-color" content="#07060c">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://www.chenbao.tech/assets/poster.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://www.chenbao.tech/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2307060c'/%3E%3Crect x='8' y='12' width='48' height='4' rx='2' fill='%236fe4ff'/%3E%3Crect x='30' y='16' width='4' height='6' fill='%236fe4ff'/%3E%3Crect x='12' y='22' width='40' height='28' rx='8' fill='%23ffb347'/%3E%3Crect x='17' y='28' width='12' height='10' rx='2' fill='%2307060c'/%3E%3Crect x='35' y='28' width='12' height='10' rx='2' fill='%2307060c'/%3E%3C/svg%3E">
+<script data-cfasync="false">
+/* Mode before first paint: ride (3D) | text (plain page) | static (no WebGL: poster + text). JS off = plain page. */
+(function () {
+  var d = document.documentElement, q = new URLSearchParams(location.search);
+  var c = navigator.connection, save = !!(c && c.saveData), mem = navigator.deviceMemory;
+  var nogl = q.get('nogl') === '1' || !window.WebGL2RenderingContext || save || (mem && mem < 2);
+  d.className = 'js ' + (nogl ? 'static text' : (q.get('text') === '1' ? 'text' : 'ride'));
+  if (q.get('ui') === '0') d.className += ' no-ui';
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  // watchdog: if the page scripts never start (blocked, old browser), fall back to the plain page
+  setTimeout(function () { if (!window.__uiReady) d.className = 'js static text'; }, 10000);
+})();
+</script>
+<link rel="preload" href="assets/poster.jpg" as="image" fetchpriority="high" media="(min-aspect-ratio: 4/5)">
+<link rel="preload" href="assets/poster-portrait.jpg" as="image" fetchpriority="high" media="(max-aspect-ratio: 799/1000)">
+<link rel="preload" href="assets/fonts/barlow-semi-condensed-600.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/ibm-plex-sans-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="css/site.css">
   <!-- Matomo -->
   <script>
     var _paq = window._paq = window._paq || [];
@@ -30,381 +47,227 @@
     })();
   </script>
   <!-- End Matomo Code -->
+<script type="importmap" data-cfasync="false">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+} }
+</script>
+<script type="module" src="js/main.js" data-cfasync="false"></script>
 </head>
-
 <body>
-  <section class="section">
-    <div class="container">
-      <div class="columns">
-        <div class="column is-2">
-          <div class="sticky">
-            <figure class="image is-128x128">
-              <img class="is-rounded" src="images/sfphoto.jpg">
-            </figure>
-            <div class="content">
+<a class="skip" href="#content">Skip to content</a>
+<div id="stage" aria-hidden="true">
+  <picture>
+    <source media="(max-aspect-ratio: 799/1000)" srcset="assets/poster-portrait.jpg" width="780" height="1688">
+    <img class="poster" src="assets/poster.jpg" alt="" width="1600" height="1000" decoding="async">
+  </picture>
+  <canvas id="gl"></canvas>
+</div>
+<div id="ride-ui"></div>
 
-              <h3></h3>
-              <h3>Chen Bao</h3>
-              <h3>鲍辰</h3>
-            </div>
-            
-            
-            <!-- details -->
-            <div class="details">
-              <h3>EMAIL</h3>
-              <p><a href="mailto:chenbao@cmu.edu">chenbao<br>[at]cmu[dot]edu</a></p>
-            </div>
-            <!-- social network icons -->
-            <div class="social">
-              <a href="https://github.com/Kami-code" target="_blank" class="social-link"><span class="link-text">GitHub</span><span class="fab fa-github fa-2x icon-fallback" style="display:none; text-decoration: none"></span></a><a href="https://scholar.google.com/citations?user=HOngPZAAAAAJ" target="_blank" class="social-link"><span class="link-text">Scholar</span><span class="fab fa-google fa-2x icon-fallback" style="display:none; text-decoration: none"></span></a><a href="https://www.linkedin.com/in/chenbao1" target="_blank" class="social-link"><span class="link-text">LinkedIn</span><span class="fab fa-linkedin fa-2x icon-fallback" style="display:none; text-decoration: none"></span></a><a href="https://twitter.com/chenbao191541" target="_blank" class="social-link"><span class="link-text">Twitter</span><i class="fab fa-twitter fa-2x icon-fallback" style="display:none; text-decoration: none"></i></a>
-            </div>
-
-
-            <div id="sidebar" class="menu sticky is-hidden-mobile">
-              <p class="menu-label"><b>Quick Links</b></p>
-              <ul class="menu-list">
-                <li><a href="#news">News</a></li>
-                <li><a href="#intro">Intro</a></li>
-                <li><a href="#research">Research</a></li>
-                <li><a href="blog">Blog</a></li>
-                <li><a href="life.html">Life</a></li>
-              </ul>
-            </div>
-          </div>
-
-
-
-        </div>
-        <div class="column">
-          <div class="content">
-            <h3 id="news">
-              News
-            </h3>
-            <ul>
-              <li><span>[2025/03] 🎉 <a href="https://github.com/haosulab/ManiSkill">ManiSkill3</a> is accepted at RSS'25 and as an oral presentation at the ICLR Robot Learning Workshop.</span></li>
-              <li><span>[2024/05] 🎉 <a href="https://github.com/haosulab/ManiSkill">ManiSkill3</a> Beta has been released! State-of-the-art fully open-source robotics simulation with the fastest parallel visual simulation, 10-1000x faster than other simulators.</span></li>
-              <li><span>[2023/11] 🎉 One paper wins the outstanding paper award at the Language Robotics workshop CoRL 2023 and gets accepted to ICLR 2024 as Spotlight. </span></li>
-              <li><span>[2023/08] 🎉 I join <a href="https://www.ri.cmu.edu/">CMU Robotics Institute</a> as a graduate student.</span></li>
-              <li><span>[2023/07] 🎉 I win the 2nd place in all three tracks of <a href="https://sapien.ucsd.edu/challenges/maniskill/">ManiSkill2 Challenge</a>. </span></li>
-              <li><span>[2023/05] 🎉 One paper gets accepted to CVPR 2023.</span></li>
-              <li><span>[2022/09] 🎉 One paper gets accepted to CoRL 2022 (Oral).</span></li>
-            </ul>
-
-            <h3 id="intro">Intro</h3>
-<p>I recently graduated with a Master's degree from the Robotics Institute at Carnegie Mellon University, where I worked with Prof. <a href="http://www.cs.cmu.edu/~abhinavg/" target="_blank" style="text-decoration: underline;">Abhinav Gupta</a> on foundation models. I previously worked at <a href="https://www.skild.ai/" target="_blank" style="text-decoration: underline;">Skild AI</a> with Prof. <a href="https://www.cs.cmu.edu/~dpathak/" target="_blank" style="text-decoration: underline;">Deepak Pathak</a>. During my graduate studies, I also collaborated with Prof. <a href="https://xiaolonw.github.io/index.html" target="_blank" style="text-decoration: underline;">Xiaolong Wang</a> at UC San Diego, focusing on robotic manipulation and computer vision. Prior to CMU, I conducted research at MVIG Lab, Shanghai Jiao Tong University, under the supervision of Prof. <a href="https://www.mvig.org/" target="_blank" style="text-decoration: underline;">Cewu Lu</a> and Dr. <a href="https://wenqiangx.github.io/" target="_blank" style="text-decoration: underline;">Wenqiang Xu</a>.</p>
-<p>
-   I received offers from Princeton University and University of Illinois at Urbana-Champaign for Fall 2025 PhD programs, but decided to pursue opportunities in industry. My research interests include generative AI for robotic perception and manipulation, reinforcement learning and imitation learning, visual representation learning using Internet-scale data.
-</p>
-            <h3 id="research">Research</h3>
-
-            <h4>2025</h4>
-
-            <article class="columns">
-              <div class="column is-3">
-                <figure class="image">
-                  <img src="images/research/2024_handsonvlm.gif">
-                </figure>
-              </div>
-              <div class="column">
-                <div class="content">
-                  <p>
-                    <i>HandsOnVLM: Vision-Language Models for Hand-Object Interaction Prediction</i><br>
-                    <b>Chen Bao</b>, Jiarui Xu, Xiaolong Wang†, Abhinav Gupta†, Homanga Bharadhwaj†.<br>
-                    Transactions on Machine Learning Research, TMLR 2025 <br>
-
-                    <a href="https://arxiv.org/abs/2412.13187" target="_blank">[<u>Paper</u>]</a>
-                    <a href="https://www.chenbao.tech/handsonvlm/" target="_blank">[<u>Website</u>]</a>
-                    <a href="https://github.com/Kami-code/HandsOnVLM-release" target="_blank">[<u>Code</u>]</a>
-                  </p>
-                </div>
-              </div>
-            </article>
-
-
-            <article class="columns">
-              <div class="column is-3">
-                <figure class="image">
-                  <br>
-                  <img src="images/research/2024_maniskill3.jpg">
-                </figure>
-              </div>
-              <div class="column">
-                <div class="content">
-                  <p>
-                    <i>ManiSkill3: GPU Parallelized Robotics Simulation and Rendering for Generalizable Embodied AI</i><br>
-                    Stone Tao, Fanbo Xiang, Arth Shukla, Yuzhe Qin, Xander Hinrichsen, Xiaodi Yuan, <b>Chen Bao*</b>, Xinsong Lin, Yulin Liu, Tse-kai Chan, Yuan Gao, Xuanlin Li, Tongzhou Mu, Nan Xiao, Arnav Gurha, Zhiao Huang, Roberto Calandra, Rui Chen, Shan Luo, Hao Su.<br>
-                    Robotics: Science and Systems, RSS 2025<br>
-                    ICLR 2025 Workshop on Robot Learning (<span style="color: #8C1515">Oral</span>)<br>
-                    <a href="https://arxiv.org/abs/2410.00425" target="_blank">[<u>Paper</u>]</a>
-                    <a href="https://www.maniskill.ai/home" target="_blank">[<u>Website</u>]</a>
-                    <a href="https://github.com/haosulab/ManiSkill" target="_blank">[<u>Code</u>]</a>
-                  </p>
-                </div>
-              </div>
-            </article>
-
-            <h4>2024</h4>
-            <article class="columns">
-              <div class="column is-3">
-                <figure class="image">
-                  <img src="images/research/2023_gensim.gif">
-                </figure>
-              </div>
-              <div class="column">
-                <div class="content">
-                  <p>
-                    <i>GenSim: Generating Robotic Simulation Tasks via Large Language Models</i><br>
-                    Lirui Wang, Yiyang Ling*, Zhecheng Yuan*, Mohit Shridhar, <b>Chen Bao</b>, Yuzhe Qin, Bailin Wang, Huazhe Xu, Xiaolong Wang. <br>
-                    International Conference on Learning Representations (<span style="color: #8C1515">Spotlight</span>), ICLR 2024<br>
-                    CoRL 2023 Workshop on Language Grounding and Robot Learning (<span style="color: #8C1515">Best Paper</span>)<br>
-                    <a href="https://arxiv.org/abs/2310.01361" target="_blank">[<u>Paper</u>]</a>
-                    <a href="https://liruiw.github.io/gensim/" target="_blank">[<u>Website</u>]</a>
-                    <a href="https://github.com/liruiw/GenSim" target="_blank">[<u>Code</u>]</a>
-                    <a href="https://huggingface.co/spaces/Gen-Sim/Gen-Sim" target="_blank">[<u>Demo</u>]</a>
-                  </p>
-                </div>
-              </div>
-            </article>
-
-            <h4>2023</h4>
-
-            <article class="columns">
-              <div class="column is-3">
-                <figure class="image">
-                  <img src="images/research/2023_dexart.png">
-                </figure>
-              </div>
-              <div class="column">
-                <div class="content">
-                  <p>
-                    <i>DexArt: Benchmarking Generalizable Dexterous Manipulation with Articulated Objects</i><br>
-                    <b>Chen Bao*</b>, Helin Xu*, Yuzhe Qin, Xiaolong Wang.<br>
-                    Computer Vision and Pattern Recognition Conference, CVPR 2023<br>
-                    <a href="https://arxiv.org/abs/2305.05706" target="_blank">[<u>Paper</u>]</a>
-                    <a href="https://www.chenbao.tech/dexart/" target="_blank">[<u>Website</u>]</a>
-                    <a href="https://github.com/Kami-code/dexart-release" target="_blank">[<u>Code</u>]</a>
-                    <a href="https://www.youtube.com/watch?v=V_EYQJO1W_U" target="_blank">[<u>Video</u>]</a>
-                  </p>
-                </div>
-              </div>
-            </article>
-            <h4>2022</h4>
-
-            <article class="columns">
-              <div class="column is-3">
-                <figure class="image">
-                  <img src="images/research/2022_robotube.png">
-                </figure>
-              </div>
-              <div class="column">
-                <div class="content">
-                  <p>
-                    <i>RoboTube: Learning Household Manipulation from Human Videos with Simulated Twin Environments</i><br>
-                    Haoyu Xiong*, Haoyuan Fu*, Jieyi Zhang, <b>Chen Bao</b>, Qiang Zhang, Yongxi Huang, Wenqiang Xu, Animesh Garg, Cewu Lu.<br>
-                    Conference on Robot Learning (<span style="color: #8C1515">Oral</span>), CoRL 2022<br>
-                    <a href="https://proceedings.mlr.press/v205/xiong23a.html" target="_blank">[<u>Paper</u>]</a>
-                    <a href="https://www.robotube.org/" target="_blank">[<u>Website</u>]</a>
-                  </p>
-                </div>
-              </div>
-            </article>
-
-            <details id="project" style="margin-top: 2rem;">
-              <summary><h3>Project</h3></summary>
-
-<!--            <h4>2022</h4>-->
-
-<!--            <article class="columns">-->
-<!--              <div class="column is-3">-->
-<!--                <figure class="image">-->
-<!--                  <img src="images/project/minik8s.png">-->
-<!--                </figure>-->
-<!--              </div>-->
-<!--              <div class="column">-->
-<!--                <div class="content">-->
-<!--                  <p>-->
-<!--                    <i>Mini-Kubernetes: A Multi-host Container Orchestration Framework</i><br>-->
-<!--                    <b>Chen Bao</b>, Team Leader<br>-->
-<!--                    Spring 2022<br>-->
-<!--                    <a href="https://github.com/Kami-code/minik8s" target="_blank">[<u>Code</u>]</a>-->
-<!--                    <ul>-->
-<!--                      <li>Developed a container orchestration system supporting multiple hosts from scratch</li>-->
-<!--                      <li>Implemented the K8s-like abstraction of Pod, Service, ReplicaSet, HPA and integrate Serverless functions</li>-->
-<!--                      <li>Built master and worker nodes using Flask server, and allocated IP addresses for each pod using Flannel</li>-->
-<!--                    </ul>-->
-<!--                  </p>-->
-<!--                </div>-->
-<!--              </div>-->
-<!--            </article>-->
-
-            <h4>2021</h4>
-<!--            <article class="columns">-->
-<!--              <div class="column is-3">-->
-<!--                <figure class="image">-->
-<!--                  <img src="images/project/chcore.png">-->
-<!--                </figure>-->
-<!--              </div>-->
-<!--              <div class="column">-->
-<!--                <div class="content">-->
-<!--                  <p>-->
-<!--                    <i>ChCore OS: A Microkernel Operation System</i><br>-->
-<!--                    <b>Chen Bao</b><br>-->
-<!--                    Fall 2021<br>-->
-<!--                    <a href="https://github.com/Kami-code/ChCore" target="_blank">[<u>Code</u>]</a>-->
-<!--                    <ul>-->
-<!--                      <li>Designed and implemented the page table structure to manage physical and virtual memory</li>-->
-<!--                      <li>Built the exception handling pipeline to support the context switch between the kernel processes and user processes</li>-->
-<!--                      <li>Supported multi-kernel and multi-process scheduling</li>-->
-<!--                    </ul>-->
-<!--                  </p>-->
-<!--                </div>-->
-<!--              </div>-->
-<!--            </article>-->
-
-<!--            <article class="columns">-->
-<!--              <div class="column is-3">-->
-<!--                <figure class="image">-->
-<!--                  <img src="images/project/compiler.png">-->
-<!--                </figure>-->
-<!--              </div>-->
-<!--              <div class="column">-->
-<!--                <div class="content">-->
-<!--                  <p>-->
-<!--                    <i>Tiger Compiler: A Compiler for Tiger Language</i><br>-->
-<!--                    <b>Chen Bao</b><br>-->
-<!--                    Fall 2021<br>-->
-<!--                    <a href="https://github.com/Kami-code/SE3355-Compliers-2021-Labs" target="_blank">[<u>Code</u>]</a>-->
-<!--                    <ul>-->
-<!--                      <li>Developed a lexical scanner using Flexc++ and a parser using Bisonc++</li>-->
-<!--                      <li>Implemented the conversion of escape-analyzed AST into tree language and then into assembly code</li>-->
-<!--                      <li>Utilized the register allocation algorithm and generated assembly code that can run on x86 machines</li>-->
-<!--                    </ul>-->
-<!--                  </p>-->
-<!--                </div>-->
-<!--              </div>-->
-<!--            </article>-->
-
-            <article class="columns">
-              <div class="column is-3">
-                <figure class="image">
-                  <img src="oasis2200/main.png">
-                </figure>
-              </div>
-              <div class="column">
-                <div class="content">
-                  <p>
-                    <i>Oasis 2200: An Online Multiplayer Battle Game</i><br>
-                    <b>Chen Bao*</b>, Boyang Zheng*, Zihong Lin*, Chen Liang*<br>
-                    Course Project of SE128 @ SJTU, 2021<br>
-                    <a href="https://www.taptap.cn/app/221746" target="_blank">[<u>TapTap</u>]</a>
-                    <a href="./oasis2200" target="_blank">[<u>Website</u>]</a>
-                    <a href="./oasis2200/Oasis2200v3.1.apk" target="_blank">[<u>APK Download</u>]</a>
-                  </p>
-                </div>
-              </div>
-            </article>
-
-<!--            <article class="columns">-->
-<!--              <div class="column is-3">-->
-<!--                <figure class="image">-->
-<!--                  <img src="images/project/ebook.png">-->
-<!--                </figure>-->
-<!--              </div>-->
-<!--              <div class="column">-->
-<!--                <div class="content">-->
-<!--                  <p>-->
-<!--                    <i>E-Book: A Containerized Online Bookstore</i><br>-->
-<!--                    <b>Chen Bao</b><br>-->
-<!--                    Spring 2021<br>-->
-<!--                    <a href="https://github.com/Kami-code/e-Book" target="_blank">[<u>Code</u>]</a>-->
-<!--                    <ul>-->
-<!--                      <li>Developed the bookstore based on the MVC layered architecture</li>-->
-<!--                      <li>Implemented full-text search functionality based on Lucene and encapsulated it with a WebService</li>-->
-<!--                      <li>Built containerized deployment of the application and databases using MySQL, Redis, MongoDB, and Neo4j</li>-->
-<!--                    </ul>-->
-<!--                  </p>-->
-<!--                </div>-->
-<!--              </div>-->
-<!--            </article>-->
-
-            </details>
-            <!--Research-->
-            <h3 id="Selected Awards and Honors">Selected Awards and Honors</h3>
-            <ul>
-              <li>2023: Shanghai Outstanding Graduate (5%)</li>
-              <li>2023: The Second Prize in ManiSkill2 Challenge (6000USD$)</li>
-              <li>2022: Yingjiao Scholarship (12000RMB¥)</li>
-              <li>2021: Shaoqiu Scholarship (10000RMB¥)</li>
-              <li>2021: Merit Student of Shanghai Jiao Tong University</li>
-              <li>2020: The First Prize of RoboMaster 2020 University Championship</li>
-              <li>2020: Junyuan Scholarship (3000RMB¥)</li>
-              <li>2018: The Second Prize of National Olympiad in Informatics in Provinces, Shanghai, China</li>
-            </ul>
-
-          </div>
-        </div>
-      </div>
-      <p>Credit: web source from <a href="http://hansf.me/">Dr. Songfang Han</a></p>
+<header id="identity" data-role="identity">
+  <img class="avatar" src="images/sfphoto.jpg" alt="" width="128" height="128" loading="lazy" decoding="async">
+  <h1 class="name"><span class="name-en">Chen Bao</span> <span class="name-zh" lang="zh-CN">鲍辰</span></h1>
+  <div class="contact">
+    <div class="details">
+      <h2 class="details-h">EMAIL</h2>
+      <p><a href="mailto:chenbao@meta.com">chenbao<br>[at]meta[dot]com</a></p>
     </div>
-  </section>
-  <script>
-    var elm = document.querySelector('#sidebar');
-    var ms = new MenuSpy(elm, {
-      activeClass: 'is-active'
-    });
-  </script>
-  <script src="https://kit.fontawesome.com/970bf0f05d.js" crossorigin="anonymous"></script>
-  <style>
-    .social-link {
-      display: inline-block;
-      margin-right: 8px;
-      margin-bottom: 8px;
-      text-decoration: none;
-      color: #3273dc;
-    }
-    .social-link:hover {
-      text-decoration: underline;
-    }
-    .link-text {
-      font-weight: 500;
-    }
-  </style>
-  <script>
-    // Show icons when FontAwesome loads
-    document.addEventListener('DOMContentLoaded', function() {
-      // Check if FontAwesome is loaded
-      function checkFontAwesome() {
-        var testIcon = document.createElement('i');
-        testIcon.className = 'fab fa-github';
-        testIcon.style.visibility = 'hidden';
-        testIcon.style.position = 'absolute';
-        document.body.appendChild(testIcon);
-        
-        var computed = window.getComputedStyle(testIcon, ':before');
-        var isLoaded = computed.content !== 'none' && computed.content !== '';
-        
-        document.body.removeChild(testIcon);
-        return isLoaded;
-      }
-      
-      function switchToIcons() {
-        if (checkFontAwesome()) {
-          document.querySelectorAll('.link-text').forEach(function(text) {
-            text.style.display = 'none';
-          });
-          document.querySelectorAll('.icon-fallback').forEach(function(icon) {
-            icon.style.display = 'inline';
-          });
-        } else {
-          // Retry after a short delay
-          setTimeout(switchToIcons, 100);
-        }
-      }
-      
-      // Try to switch to icons
-      switchToIcons();
-    });
-  </script>
-</body>
+    <!-- icon links as on the source page; accessible names = its link texts (shown there until the icon font loads).
+         Icons: Font Awesome Free 5.9.0 brands (CC BY 4.0), the set the source page uses. -->
+    <ul class="social">
+      <li><a href="https://github.com/Kami-code" target="_blank" aria-label="GitHub"><svg class="ico" viewBox="0 0 496 512" aria-hidden="true" focusable="false"><path fill="currentColor" d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></a></li>
+      <li><a href="https://scholar.google.com/citations?user=HOngPZAAAAAJ" target="_blank" aria-label="Scholar"><svg class="ico" viewBox="0 0 488 512" aria-hidden="true" focusable="false"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"/></svg></a></li>
+      <li><a href="https://www.linkedin.com/in/chenbao1" target="_blank" aria-label="LinkedIn"><svg class="ico" viewBox="0 0 448 512" aria-hidden="true" focusable="false"><path fill="currentColor" d="M416 32H31.9C14.3 32 0 46.5 0 64.3v383.4C0 465.5 14.3 480 31.9 480H416c17.6 0 32-14.5 32-32.3V64.3c0-17.8-14.4-32.3-32-32.3zM135.4 416H69V202.2h66.5V416zm-33.2-243c-21.3 0-38.5-17.3-38.5-38.5S80.9 96 102.2 96c21.2 0 38.5 17.3 38.5 38.5 0 21.3-17.2 38.5-38.5 38.5zm282.1 243h-66.4V312c0-24.8-.5-56.7-34.5-56.7-34.6 0-39.9 27-39.9 54.9V416h-66.4V202.2h63.7v29.2h.9c8.9-16.8 30.6-34.5 62.9-34.5 67.2 0 79.7 44.3 79.7 101.9V416z"/></svg></a></li>
+      <li><a href="https://twitter.com/chenbao191541" target="_blank" aria-label="Twitter"><svg class="ico" viewBox="0 0 512 512" aria-hidden="true" focusable="false"><path fill="currentColor" d="M459.37 151.716c.325 4.548.325 9.097.325 13.645 0 138.72-105.583 298.558-298.558 298.558-59.452 0-114.68-17.219-161.137-47.106 8.447.974 16.568 1.299 25.34 1.299 49.055 0 94.213-16.568 130.274-44.832-46.132-.975-84.792-31.188-98.112-72.772 6.498.974 12.995 1.624 19.818 1.624 9.421 0 18.843-1.3 27.614-3.573-48.081-9.747-84.143-51.98-84.143-102.985v-1.299c13.969 7.797 30.214 12.67 47.431 13.319-28.264-18.843-46.781-51.005-46.781-87.391 0-19.492 5.197-37.36 14.294-52.954 51.655 63.675 129.3 105.258 216.365 109.807-1.624-7.797-2.599-15.918-2.599-24.04 0-57.828 46.782-104.934 104.934-104.934 30.213 0 57.502 12.67 76.67 33.137 23.715-4.548 46.456-13.32 66.599-25.34-7.798 24.366-24.366 44.833-46.132 57.827 21.117-2.273 41.584-8.122 60.426-16.243-14.292 20.791-32.161 39.308-52.628 54.253z"/></svg></a></li>
+    </ul>
+  </div>
+  <nav class="quick-links" data-role="quick-links" aria-labelledby="ql-label">
+    <p class="menu-label" id="ql-label"><b>Quick Links</b></p>
+    <ul>
+      <li><a href="#news">News</a></li>
+      <li><a href="#intro">Intro</a></li>
+      <li><a href="#research">Research</a></li>
+      <li><a href="blog">Blog</a></li>
+      <li><a href="life.html">Life</a></li>
+    </ul>
+  </nav>
+</header>
 
+<main id="content">
+
+  <section id="news" data-stop="news">
+    <h2>News</h2>
+    <ul class="news">
+      <li><span><time datetime="2026-05">[2026/05]</time> 🎉 ARI is acquired by Meta. I join <a href="https://ai.meta.com/">Meta Superintelligence Labs</a>.</span></li>
+      <li><span><time datetime="2025-07">[2025/07]</time> 🎉 I join <a href="https://www.linkedin.com/company/arirobots">Assured Robot Intelligence (ARI)</a> as a founding researcher.</span></li>
+      <li><span><time datetime="2025-01">[2025/01]</time> 🎉 I join <a href="https://www.skild.ai/">Skild AI</a> as a member of technical staff.</span></li>
+      <li><span><time datetime="2025-03">[2025/03]</time> 🎉 <a href="https://github.com/haosulab/ManiSkill">ManiSkill3</a> is accepted at RSS'25 and as an oral presentation at the ICLR Robot Learning Workshop.</span></li>
+      <li><span><time datetime="2023-11">[2023/11]</time> 🎉 One paper wins the outstanding paper award at the Language Robotics workshop CoRL 2023 and gets accepted to ICLR 2024 as Spotlight. </span></li>
+      <li><span><time datetime="2023-08">[2023/08]</time> 🎉 I join <a href="https://www.ri.cmu.edu/">CMU Robotics Institute</a> as a graduate student.</span></li>
+    </ul>
+  </section>
+
+  <section id="intro" data-stop="intro">
+    <h2>Intro</h2>
+    <p>I am a Researcher at <a href="https://ai.meta.com/" target="_blank">Meta Superintelligence Labs</a>, working on frontier robotics models. Previously, I was a founding researcher at <a href="https://www.linkedin.com/company/arirobots" target="_blank">Assured Robot Intelligence (ARI)</a>, which was acquired by Meta in May 2026.</p>
+    <p>I received my Master's degree from the Robotics Institute at Carnegie Mellon University, where I worked with Prof. <a href="http://www.cs.cmu.edu/~abhinavg/" target="_blank">Abhinav Gupta</a> and Prof. <a href="https://xiaolonw.github.io/index.html" target="_blank">Xiaolong Wang</a>. After graduating, I worked at <a href="https://www.skild.ai/" target="_blank">Skild AI</a> with Prof. <a href="https://www.cs.cmu.edu/~dpathak/" target="_blank">Deepak Pathak</a>. Prior to CMU, I conducted research at Shanghai Jiao Tong University with Prof. <a href="https://www.mvig.org/" target="_blank">Cewu Lu</a>.</p>
+    <p>My research focuses on scalable learning for humanoid robots. I received offers from Princeton University and University of Illinois at Urbana-Champaign for Fall 2025 PhD programs, but decided to pursue opportunities in industry.</p>
+  </section>
+
+  <section id="research" data-group="research">
+    <h2>Research</h2>
+
+    <article id="paper-handsonvlm" class="paper" data-stop="paper-handsonvlm"
+             data-media="assets/papers/handsonvlm.mp4" data-media-type="video" data-media-w="704" data-media-h="396"
+             data-poster="assets/papers/handsonvlm.jpg" data-still="assets/papers/handsonvlm.webp"
+             data-original="images/research/2024_handsonvlm.gif">
+      <figure class="teaser">
+        <picture>
+          <source type="image/webp" srcset="assets/papers/handsonvlm.webp">
+          <img src="assets/papers/handsonvlm.jpg" width="853" height="480" alt="" loading="lazy" decoding="async">
+        </picture>
+      </figure>
+      <h3 class="title"><i>HandsOnVLM: Vision-Language Models for Hand-Object Interaction Prediction</i></h3>
+      <p class="authors"><b>Chen Bao</b>, Jiarui Xu, Xiaolong Wang†, Abhinav Gupta†, Homanga Bharadhwaj†.</p>
+      <p class="venue">Transactions on Machine Learning Research, TMLR 2025</p>
+      <p class="links">
+        <a href="https://arxiv.org/abs/2412.13187" target="_blank">[<u>Paper</u>]</a>
+        <a href="https://www.chenbao.tech/handsonvlm/" target="_blank">[<u>Website</u>]</a>
+        <a href="https://github.com/Kami-code/HandsOnVLM-release" target="_blank">[<u>Code</u>]</a>
+      </p>
+    </article>
+
+    <article id="paper-maniskill3" class="paper" data-stop="paper-maniskill3"
+             data-media="assets/papers/maniskill3.webp" data-media-type="image" data-media-w="1024" data-media-h="461"
+             data-poster="assets/papers/maniskill3.jpg"
+             data-original="images/research/2024_maniskill3.jpg">
+      <figure class="teaser">
+        <picture>
+          <source type="image/webp" srcset="assets/papers/maniskill3.webp">
+          <img src="assets/papers/maniskill3.jpg" width="1024" height="461" alt="" loading="lazy" decoding="async">
+        </picture>
+      </figure>
+      <h3 class="title"><i>ManiSkill3: GPU Parallelized Robotics Simulation and Rendering for Generalizable Embodied AI</i></h3>
+      <p class="authors">Stone Tao, Fanbo Xiang, Arth Shukla, Yuzhe Qin, Xander Hinrichsen, Xiaodi Yuan, <b>Chen Bao*</b>, Xinsong Lin, Yulin Liu, Tse-kai Chan, Yuan Gao, Xuanlin Li, Tongzhou Mu, Nan Xiao, Arnav Gurha, Zhiao Huang, Roberto Calandra, Rui Chen, Shan Luo, Hao Su.</p>
+      <p class="venue">Robotics: Science and Systems, RSS 2025</p>
+      <p class="venue">ICLR 2025 Workshop on Robot Learning (<span class="badge">Oral</span>)</p>
+      <p class="links">
+        <a href="https://arxiv.org/abs/2410.00425" target="_blank">[<u>Paper</u>]</a>
+        <a href="https://www.maniskill.ai/home" target="_blank">[<u>Website</u>]</a>
+        <a href="https://github.com/haosulab/ManiSkill" target="_blank">[<u>Code</u>]</a>
+      </p>
+    </article>
+
+    <article id="paper-gensim" class="paper" data-stop="paper-gensim"
+             data-media="assets/papers/gensim.mp4" data-media-type="video" data-media-w="600" data-media-h="338"
+             data-poster="assets/papers/gensim.jpg" data-still="assets/papers/gensim.webp"
+             data-original="images/research/2023_gensim.gif">
+      <figure class="teaser">
+        <picture>
+          <source type="image/webp" srcset="assets/papers/gensim.webp">
+          <img src="assets/papers/gensim.jpg" width="600" height="338" alt="" loading="lazy" decoding="async">
+        </picture>
+      </figure>
+      <h3 class="title"><i>GenSim: Generating Robotic Simulation Tasks via Large Language Models</i></h3>
+      <p class="authors">Lirui Wang, Yiyang Ling*, Zhecheng Yuan*, Mohit Shridhar, <b>Chen Bao</b>, Yuzhe Qin, Bailin Wang, Huazhe Xu, Xiaolong Wang.</p>
+      <p class="venue">International Conference on Learning Representations (<span class="badge">Spotlight</span>), ICLR 2024</p>
+      <p class="venue">CoRL 2023 Workshop on Language Grounding and Robot Learning (<span class="badge">Best Paper</span>)</p>
+      <p class="links">
+        <a href="https://arxiv.org/abs/2310.01361" target="_blank">[<u>Paper</u>]</a>
+        <a href="https://liruiw.github.io/gensim/" target="_blank">[<u>Website</u>]</a>
+        <a href="https://github.com/liruiw/GenSim" target="_blank">[<u>Code</u>]</a>
+        <a href="https://huggingface.co/spaces/Gen-Sim/Gen-Sim" target="_blank">[<u>Demo</u>]</a>
+      </p>
+    </article>
+
+    <article id="paper-dexart" class="paper" data-stop="paper-dexart"
+             data-media="assets/papers/dexart.webp" data-media-type="image" data-media-w="1024" data-media-h="463"
+             data-poster="assets/papers/dexart.jpg"
+             data-original="images/research/2023_dexart.png">
+      <figure class="teaser">
+        <picture>
+          <source type="image/webp" srcset="assets/papers/dexart.webp">
+          <img src="assets/papers/dexart.jpg" width="1024" height="463" alt="" loading="lazy" decoding="async">
+        </picture>
+      </figure>
+      <h3 class="title"><i>DexArt: Benchmarking Generalizable Dexterous Manipulation with Articulated Objects</i></h3>
+      <p class="authors"><b>Chen Bao*</b>, Helin Xu*, Yuzhe Qin, Xiaolong Wang.</p>
+      <p class="venue">Computer Vision and Pattern Recognition Conference, CVPR 2023</p>
+      <p class="links">
+        <a href="https://arxiv.org/abs/2305.05706" target="_blank">[<u>Paper</u>]</a>
+        <a href="https://www.chenbao.tech/dexart/" target="_blank">[<u>Website</u>]</a>
+        <a href="https://github.com/Kami-code/dexart-release" target="_blank">[<u>Code</u>]</a>
+        <a href="https://www.youtube.com/watch?v=V_EYQJO1W_U" target="_blank">[<u>Video</u>]</a>
+      </p>
+    </article>
+
+    <article id="paper-robotube" class="paper" data-stop="paper-robotube"
+             data-media="assets/papers/robotube.webp" data-media-type="image" data-media-w="1024" data-media-h="487"
+             data-poster="assets/papers/robotube.jpg"
+             data-original="images/research/2022_robotube.png">
+      <figure class="teaser">
+        <picture>
+          <source type="image/webp" srcset="assets/papers/robotube.webp">
+          <img src="assets/papers/robotube.jpg" width="1024" height="487" alt="" loading="lazy" decoding="async">
+        </picture>
+      </figure>
+      <h3 class="title"><i>RoboTube: Learning Household Manipulation from Human Videos with Simulated Twin Environments</i></h3>
+      <p class="authors">Haoyu Xiong*, Haoyuan Fu*, Jieyi Zhang, <b>Chen Bao</b>, Qiang Zhang, Yongxi Huang, Wenqiang Xu, Animesh Garg, Cewu Lu.</p>
+      <p class="venue">Conference on Robot Learning (<span class="badge">Oral</span>), CoRL 2022</p>
+      <p class="links">
+        <a href="https://proceedings.mlr.press/v205/xiong23a.html" target="_blank">[<u>Paper</u>]</a>
+        <a href="https://www.robotube.org/" target="_blank">[<u>Website</u>]</a>
+      </p>
+    </article>
+  </section>
+
+  <section id="project" data-stop="project">
+    <!-- collapsed on the plain page, as on the source page; opened at its ride stop -->
+    <details class="project-box">
+      <summary><h2>Project</h2></summary>
+      <h3 class="year">2021</h3>
+      <article id="project-oasis2200" class="project"
+               data-media="assets/projects/oasis2200-gameplay.mp4" data-media-type="video" data-media-w="720" data-media-h="406"
+               data-poster="assets/projects/oasis2200-gameplay.jpg"
+               data-still="assets/projects/oasis2200.webp" data-teaser="assets/projects/oasis2200-teaser.webp"
+               data-original="oasis2200/main.png">
+        <figure class="teaser">
+          <picture>
+            <source type="image/webp" srcset="assets/projects/oasis2200.webp">
+            <img src="assets/projects/oasis2200.jpg" width="720" height="405" alt="" loading="lazy" decoding="async">
+          </picture>
+        </figure>
+        <h4 class="title"><i>Oasis 2200: An Online Multiplayer Battle Game</i></h4>
+        <p class="authors"><b>Chen Bao*</b>, Boyang Zheng*, Zihong Lin*, Chen Liang*</p>
+        <p class="venue">Course Project of SE128 @ SJTU, 2021</p>
+        <p class="links">
+          <a href="https://www.taptap.cn/app/221746" target="_blank">[<u>TapTap</u>]</a>
+          <a href="./oasis2200" target="_blank">[<u>Website</u>]</a>
+          <a href="./oasis2200/Oasis2200v3.1.apk" target="_blank">[<u>APK Download</u>]</a>
+        </p>
+      </article>
+    </details>
+  </section>
+
+  <section id="awards" data-stop="awards">
+    <h2 id="Selected Awards and Honors">Selected Awards and Honors</h2>
+    <ul class="awards">
+      <li>2023: Shanghai Outstanding Graduate (5%)</li>
+      <li>2023: The Second Prize in ManiSkill2 Challenge (6000USD$)</li>
+      <li>2022: Yingjiao Scholarship (12000RMB¥)</li>
+      <li>2021: Shaoqiu Scholarship (10000RMB¥)</li>
+      <li>2021: Merit Student of Shanghai Jiao Tong University</li>
+      <li>2020: The First Prize of RoboMaster 2020 University Championship</li>
+      <li>2020: Junyuan Scholarship (3000RMB¥)</li>
+      <li>2018: The Second Prize of National Olympiad in Informatics in Provinces, Shanghai, China</li>
+    </ul>
+    <p class="credit" data-role="credit">Credit: web source from <a href="http://hansf.me/">Dr. Songfang Han</a></p>
+  </section>
+
+</main>
+
+<div id="track" aria-hidden="true"></div>
+</body>
 </html>
