@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generator": "_work/layers/gen_layers.py (numpy/PIL, seed 20260927) + deliver.py + _work/fix/layers (close: 2x px/m, no overlapping signs) + _work/layers-en (English signage, same layout)",
+  "generator": "_work/layers/gen_layers.py (numpy/PIL, seed 20260927) + deliver.py + _work/fix/layers (close: 2x px/m, no overlapping signs) + _work/layers-en (English signage, same layout) + _work/layers-en (English signage, same layout)",
   "style": "雾港·第九区 night harbour city: indigo/violet base, magenta/cyan/amber neon, fog near the ground",
   "eyeAboveStreetM": 14.0,
   "coordinates": "Each layer is a camera-facing plane parallel to the car side, `depthM` metres from the eye. Heights are metres relative to the EYE (street = -eyeAboveStreetM). Image row 0 = yTopM, last row = yBottomM. One image repeats every tileWidthM metres horizontally (wrapS = RepeatWrapping; seamless).",
@@ -142,15 +142,15 @@
       "renderOrder": 4,
       "bottomColor": "#2e1e32",
       "topColor": "#0a070b",
-      "bytes": 277042,
-      "bytes2k": 119980,
+      "bytes": 277414,
+      "bytes2k": 120110,
       "optional": true,
       "notes": "Rooftops across the street ~40 m: dark silhouettes, neon/lightbox signs, water tanks, cables, shops, wet street. Regenerated at 40 px/m (close-hi.webp, used on large / HiDPI desktop screens); overlapping signs removed.",
       "fileHi": "close-hi.webp",
       "widthHi": 8192,
-      "bytesHi": 438440
+      "bytesHi": 439434
     }
   ],
-  "totalBytes": 949942,
-  "totalBytes2k": 491596
+  "totalBytes": 950314,
+  "totalBytes2k": 491726
 }
