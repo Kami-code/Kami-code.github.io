@@ -1,3 +1,4 @@
+/*! chenbao.tech | (c) 2026 Chen Bao | MIT License | https://chenbao.tech | please credit: "Based on chenbao.tech by Chen Bao" */
 // ui.js — HTML layer: stops read from the page's [data-stop] sections, scroll -> stop progress,
 // cards, route map (stop rail), phone dock, text view toggle, keyboard, hint, debug panel.
 // The HTML in index.html is the single source of truth (its text = the owner's page, verbatim). Nothing here adds

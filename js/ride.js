@@ -1,3 +1,4 @@
+/*! chenbao.tech | (c) 2026 Chen Bao | MIT License | https://chenbao.tech | please credit: "Based on chenbao.tech by Chen Bao" */
 // ride.js — first-person ride inside the suspended monorail car.
 // Renderer, car (assets/car.glb), camera + look-around, parallax city layers (assets/layers),
 // guideway pillars + lamps (instanced), hologram panels per stop, in-car displays, motion sim.

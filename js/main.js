@@ -1,3 +1,4 @@
+/*! chenbao.tech | (c) 2026 Chen Bao | MIT License | https://chenbao.tech | please credit: "Based on chenbao.tech by Chen Bao" */
 // main.js — boot: feature detection, fallbacks, URL params, then lazy-load the 3D ride.
 //
 // URL params (deterministic screenshots):
