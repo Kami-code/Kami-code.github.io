@@ -62,12 +62,12 @@
   setTimeout(function () { if (!window.__uiReady) d.className = 'js static text'; }, 10000);
 })();
 </script>
-<link rel="preload" href="assets/poster.jpg" as="image" fetchpriority="high" media="(min-aspect-ratio: 4/5)">
-<link rel="preload" href="assets/poster-portrait.jpg" as="image" fetchpriority="high" media="(max-aspect-ratio: 799/1000)">
+<link rel="preload" href="assets/poster.jpg?v=20260928a" as="image" fetchpriority="high" media="(min-aspect-ratio: 4/5)">
+<link rel="preload" href="assets/poster-portrait.jpg?v=20260928a" as="image" fetchpriority="high" media="(max-aspect-ratio: 799/1000)">
 <link rel="preload" href="assets/fonts/barlow-semi-condensed-600.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/fonts/ibm-plex-sans-var.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<link rel="stylesheet" href="css/site.css">
+<link rel="stylesheet" href="css/site.css?v=20260928a">
   <!-- Matomo -->
   <script>
     var _paq = window._paq = window._paq || [];
@@ -92,14 +92,14 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
 } }
 </script>
-<script type="module" src="js/main.js" data-cfasync="false"></script>
+<script type="module" src="js/main.js?v=20260928a" data-cfasync="false"></script>
 </head>
 <body>
 <a class="skip" href="#content">Skip to content</a>
 <div id="stage" aria-hidden="true">
   <picture>
-    <source media="(max-aspect-ratio: 799/1000)" srcset="assets/poster-portrait.jpg" width="780" height="1688">
-    <img class="poster" src="assets/poster.jpg" alt="" width="1600" height="1000" decoding="async">
+    <source media="(max-aspect-ratio: 799/1000)" srcset="assets/poster-portrait.jpg?v=20260928a" width="780" height="1688">
+    <img class="poster" src="assets/poster.jpg?v=20260928a" alt="" width="1600" height="1000" decoding="async">
   </picture>
   <canvas id="gl"></canvas>
 </div>

@@ -15,7 +15,7 @@
 // GPU (ride.dispose), remembers the verdict in localStorage ('cb3d', read by the head script) and shows a small
 // notice whose button — like the view toggle — tries the 3D again (and clears the verdict).
 
-import { initUI } from './ui.js';
+import { initUI } from './ui.js?v=20260928a';
 
 const P = new URLSearchParams(location.search);
 const root = document.documentElement;
@@ -77,7 +77,7 @@ function startRide() {
   watchdog(att);
   att.promise = (async () => {
     try {
-      const { createRide } = await import('./ride.js');
+      const { createRide } = await import('./ride.js?v=20260928a');
       if (att.failed) return null;
       const ride = await createRide({
         canvas, ui, P, reduced, force: force3d, signal: att.ac.signal,

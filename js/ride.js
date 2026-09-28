@@ -176,9 +176,10 @@ export async function createRide({ canvas, ui, P, reduced, force = false, signal
   const texLoader = new THREE.TextureLoader();
   // large / HiDPI desktop canvases get the 2x close layer (40 px/m) so its signs stay crisp
   const useHiLayers = !useSmallLayers && innerWidth * Math.min(devicePixelRatio || 1, 2) >= 1800 && renderer.capabilities.maxTextureSize >= 8192;
+  const ASSET_V = '20260928a';   // cache-busting token for the layer images (tools/bump-version.py)
   const layerFile = (L) => (useSmallLayers ? L.file2k : useHiLayers && L.fileHi ? L.fileHi : L.file);
   const layersP = layersMetaP.then((meta) => Promise.all(meta.layers.map((L) =>
-    loadTex('assets/layers/' + layerFile(L), texLoader).then((tex) => ({ L, tex })))).then((arr) => ({ meta, arr })));
+    loadTex('assets/layers/' + layerFile(L) + '?v=' + ASSET_V, texLoader).then((tex) => ({ L, tex })))).then((arr) => ({ meta, arr })));
   layersP.catch(() => {});   // awaited below; this only stops an early rejection being reported as unhandled
 
   const gltf = await need(carP);
