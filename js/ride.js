@@ -510,7 +510,7 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
   const holoTargets = [];
   async function ensureHolo(i) {
     if (holos.has(i)) return holos.get(i);
-    const H = createHologram(stops[i], { frozen, reduced, texLoader, maxAniso, renderer });
+    const H = createHologram(stops[i], { frozen, reduced, texLoader, maxAniso, renderer, parked: () => parkedOpen() });
     holos.set(i, H);
     outside.add(H.group);
     holoTargets.push(...H.pickables);
@@ -710,6 +710,8 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
     if (ui.locked && lockTarget !== null) return lockTarget;
     return distForS(ui.getTargetS());
   }
+  // parked at a stop with the doors open and no other stop chosen: the only time media start-up work may run
+  const parkedOpen = () => sim.v === 0 && sim.doorU === 1 && stopAtD(sim.D) >= 0 && Math.abs(targetD() - sim.D) < 0.01;
 
   function step(dt) {
     const Dt = targetD();
@@ -756,6 +758,7 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
   buildLayers(layerData);
   await fontsP;
   routeDisp.draw(''); headerDisp.draw('');
+  board.prefit();
 
   if (frozen && !frozenP) run(frozenT);
   if (frozenP) sim.t = frozenT;
@@ -867,11 +870,12 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
     }
     holoLight.intensity = 2.2 * spill;
     // parked, doors open: prime this stop's and the neighbours' videos (one per ~0.3 s, outside the frame), so no
-    // media start-up lands in the middle of a hop
+    // media start-up lands in the middle of a hop. Checked again when the timeout runs: a tap / swipe in between
+    // has already set the doors closing, and the video start-up (tens of ms) would land in the departure.
     const atNow = stopAtD(sim.D);
     if (atNow >= 0 && sim.v === 0 && sim.doorU === 1 && sim.dwell > 0.8 && sim.t - primeT > 0.3) {
       const H = [atNow, atNow + 1, atNow - 1].map((k) => holos.get(k)).find((h) => h && !h.primed());
-      if (H) { primeT = sim.t; setTimeout(() => H.prime(), 0); }
+      if (H) { primeT = sim.t; setTimeout(() => { if (parkedOpen()) H.prime(); }, 0); }
     }
 
     // displays
@@ -1283,22 +1287,33 @@ function stationBoard(stops, maxAniso) {
   const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, Y0, 0.08), dark); post.position.set(0, Y0 / 2, -0.01);
   group.add(post, frame, face);
   let cur = -1;
+  // label size that fits the board, found once per stop while the ride loads (prefit): shrinking it inside show(),
+  // which runs when the car passes the middle of a hop, cost ~90 ms of measureText on a 4x-throttled CPU
+  const fitSize = new Map();
+  function labelSize(k) {
+    if (fitSize.has(k)) return fitSize.get(k);
+    const label = stops[k].label;
+    let fs = 120; x.font = `600 ${fs}px ${FONT_SIGN}`;
+    while (x.measureText(label).width > c.width - 250 && fs > 48) { fs -= 6; x.font = `600 ${fs}px ${FONT_SIGN}`; }
+    fitSize.set(k, fs);
+    return fs;
+  }
   function show(k) {
     if (k === cur) return; cur = k;
     const s = stops[k], w = c.width, h = c.height;
+    const fs = labelSize(k);
     x.fillStyle = '#0b1020'; x.fillRect(0, 0, w, h);
     x.fillStyle = '#6fe4ff'; x.fillRect(0, 0, w, 8);
     x.fillStyle = '#ffb347'; x.fillRect(34, 50, 132, 132);
     x.fillStyle = '#1b1003'; x.font = `600 84px ${FONT_SIGN}`; x.textAlign = 'center'; x.textBaseline = 'middle';
     x.fillText(String(k + 1).padStart(2, '0'), 100, 120);
     x.fillStyle = '#f3f7ff'; x.textAlign = 'left';
-    let fs = 120; x.font = `600 ${fs}px ${FONT_SIGN}`;
-    const label = s.label;
-    while (x.measureText(label).width > w - 250 && fs > 48) { fs -= 6; x.font = `600 ${fs}px ${FONT_SIGN}`; }
-    x.fillText(label, 200, 122);
+    x.font = `600 ${fs}px ${FONT_SIGN}`;
+    x.fillText(s.label, 200, 122);
     tex.needsUpdate = true;
   }
-  return { group, show };
+  const prefit = () => { for (let k = 0; k < stops.length; k++) labelSize(k); };
+  return { group, show, prefit };
 }
 
 // ================================================================= fonts (canvas text needs them loaded)
@@ -1388,7 +1403,7 @@ function holoText(stop, maxW) {
   };
 }
 
-function createHologram(stop, { frozen, reduced, texLoader, maxAniso, renderer }) {
+function createHologram(stop, { frozen, reduced, texLoader, maxAniso, renderer, parked }) {
   const group = new THREE.Group();
   const hasMedia = !!stop.media;
   const W = 10.4;                                       // media width (m)
@@ -1470,12 +1485,16 @@ function createHologram(stop, { frozen, reduced, texLoader, maxAniso, renderer }
           videoTex.needsUpdate = true;
           try { renderer.initTexture(videoTex); } catch (e) { /* uploaded on first use */ }
         };
-        video.addEventListener('loadeddata', makeTex, { once: true });
-        video.addEventListener('playing', () => {
+        // ... and that allocation + upload only while parked with the doors open: loadeddata arrives ~0.2 s after
+        // the element was created, possibly after the visitor chose the next stop (then it waits for the next park)
+        const whenParked = (fn) => { if (!parked || parked()) fn(); else setTimeout(() => whenParked(fn), 250); };
+        const swapIn = () => {
           if (videoOn) return;
           makeTex(); videoOn = true;
           mediaMat.uniforms.map.value = videoTex;
-        }, { once: true });
+        };
+        video.addEventListener('loadeddata', () => whenParked(makeTex), { once: true });
+        video.addEventListener('playing', () => { if (videoTex) swapIn(); else whenParked(swapIn); }, { once: true });
       };
     }
   }

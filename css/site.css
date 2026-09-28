@@ -188,12 +188,19 @@ svg.ico { display: block; width: 1em; height: 1em; }
 
 html.ride, html.ride body { background: #030307; }
 html.ride { scroll-snap-type: y proximity; }
-/* touch: a fling always ends on a stop (proximity could leave the car parked between stations); the wheel is
-   handled in ui.js (one stop per gesture) */
-@media (pointer: coarse) { html.ride { scroll-snap-type: y mandatory; } }
+/* touch screens: the stops are discrete (ui.js: one swipe or dock tap = one stop, the ride's target is the chosen
+   stop), so the page itself does not scroll in ride mode: no scroll track, nothing for the root to rubber-band or
+   pull-to-refresh, and a card that scrolls keeps its scroll to itself */
+@media (pointer: coarse) {
+  html.ride { scroll-snap-type: none; overscroll-behavior: none; }
+  html.ride body { min-height: 0; }
+}
 html.ride body { overflow-x: hidden; }
+/* no double-tap-to-zoom wait / zoom on the ride controls (two quick taps on › = two stops) */
+#dock button, #tools button, #rail a { touch-action: manipulation; }
 
-html.ride #stage { position: fixed; inset: 0; height: auto; touch-action: pan-y; }
+/* pan-y: a sideways drag on the 3D view is the look-around (ride.js); pinch-zoom stays available */
+html.ride #stage { position: fixed; inset: 0; height: auto; touch-action: pan-y; touch-action: pan-y pinch-zoom; }
 html.ride #stage .poster { object-position: 50% 45%; }
 html.ride #stage::after {
   background:
@@ -204,6 +211,7 @@ html.ride.gl-ready #stage canvas { opacity: 1; }
 html.ride.gl-ready #stage .poster { visibility: hidden; transition: visibility 0s 1s; }
 html.ride #track { display: block; }
 html.ride #track .snap { height: 100vh; height: 100svh; scroll-snap-align: start; }
+@media (pointer: coarse) { html.ride #track { display: none; } }
 
 /* --- glass panel shared look --- */
 html.ride #identity, html.ride main#content [data-stop], #rail, #tools button, #dock, #debug, #hint {
@@ -260,6 +268,8 @@ html.ride main#content [data-stop].is-active {
   opacity: 1; visibility: visible; transform: none;
   transition: opacity 0.35s ease, transform 0.35s ease, visibility 0s;
 }
+/* touch: a card's own scroll never chains to the (non-scrolling) page */
+@media (pointer: coarse) { html.ride main#content [data-stop] { overscroll-behavior: contain; } }
 html.ride main#content section { padding-top: 14px; }
 html.ride .kicker {
   display: flex; align-items: center; gap: 8px; margin: 0 0 8px;

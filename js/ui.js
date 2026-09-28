@@ -75,6 +75,12 @@ export function initUI({ P, reduced, mode, onWantRide }) {
   const stops = readStops();
   const N = stops.length;
   const phoneMQ = matchMedia('(max-width: 700px), (max-width: 1024px) and (orientation: portrait)');
+  // Touch screens ride DISCRETELY: one swipe or dock tap = one stop, and the ride's target is the chosen stop, not
+  // a scroll position. The page itself does not scroll in ride mode there (css: #track hidden under the same query).
+  // (iOS Safari ignored / snapped back programmatic scrolls of the mandatory-snap root once its toolbar had
+  // collapsed, and every drag past the stop's dead zone started the doors closing even when the snap went back.)
+  const touchMQ = matchMedia('(pointer: coarse)');
+  const discrete = () => touchMQ.matches && root.classList.contains('ride');
   let active = -1;
   let ride = null;            // ride API once 3D is running
   let lockedByParam = P.has('stop') || P.has('p');
@@ -181,7 +187,7 @@ export function initUI({ P, reduced, mode, onWantRide }) {
 
   // ---------- helpers ----------
   const clampS = (s) => Math.max(0, Math.min(N - 1, s));
-  function getTargetS() { return clampS(scrollY / snapH()); }
+  function getTargetS() { return discrete() ? clampS(Math.max(0, active)) : clampS(scrollY / snapH()); }
 
   function setActive(i) {
     if (i === active) return;
@@ -225,7 +231,8 @@ export function initUI({ P, reduced, mode, onWantRide }) {
       // crawled through the dead zones of the stops in between).
       navTarget = null;
       lastS = i;
-      window.scrollTo({ top: i * snapH(), behavior: 'auto' });
+      if (discrete()) hint.classList.add('gone');                 // touch: the chosen stop is the target itself
+      else window.scrollTo({ top: i * snapH(), behavior: 'auto' });
       setActive(i);
     } else {
       stops[i].el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
@@ -237,7 +244,7 @@ export function initUI({ P, reduced, mode, onWantRide }) {
   let lastScrollT = -1e9;    // time of the last scroll event (a fling in progress must not be interrupted)
   function onScroll() {
     lastScrollT = performance.now();
-    if (!root.classList.contains('ride')) return;
+    if (!root.classList.contains('ride') || discrete()) return;
     if (P.has('t') && lockedByParam && !userMoved && scrollY < 8) return;
     const s = getTargetS();
     lastS = s;
@@ -292,6 +299,75 @@ export function initUI({ P, reduced, mode, onWantRide }) {
     const k = Math.max(0, Math.min(N - 1, active + dir));
     if (k !== active) goTo(k); else if (hint) hint.classList.add('gone');
   }, { passive: false });
+
+  // ---------- touch (discrete mode): one vertical swipe = one stop, decided when the finger lifts ----------
+  // Far enough (7 % of the height, >= 48 px) or a flick (>= 24 px at >= 0.3 px/ms: the release speed, or the average
+  // of a gesture shorter than 0.3 s) moves exactly one stop. A short drag, or one the finger pulled back from (by a
+  // quarter of its reach, or still moving back at release) changes nothing, so the doors never start to close for it.
+  // Not ours: a gesture that starts in something that scrolls itself (a long card, the open station list), a second
+  // finger (pinch-zoom), or any drag while the page is zoomed in (panning the zoomed view). A vertical nav drag is
+  // preventDefault-ed (non-passive touchmove), so no rubber band / pull-to-refresh / toolbar move happens under it.
+  const scrollsY = (el) => {
+    for (let n = el; n && n !== document.body && n !== root; n = n.parentElement) {
+      if (n.scrollHeight <= n.clientHeight + 1) continue;
+      const oy = getComputedStyle(n).overflowY;
+      if (oy === 'auto' || oy === 'scroll') return true;
+    }
+    return false;
+  };
+  const TG = { id: null, x0: 0, y0: 0, t0: 0, axis: '', up: 0, down: 0, trail: [] };
+  const touchOf = (list) => { for (const t of list) if (t.identifier === TG.id) return t; return null; };
+  addEventListener('touchstart', (e) => {
+    TG.id = null;
+    if (!discrete() || e.touches.length !== 1) return;
+    const t = e.changedTouches[0], el = e.target instanceof Element ? e.target : null;
+    if (el && (el.closest('#rail.open') || scrollsY(el))) return;
+    if (window.visualViewport && visualViewport.scale > 1.01) return;
+    TG.id = t.identifier; TG.x0 = t.clientX; TG.y0 = t.clientY; TG.axis = ''; TG.up = 0; TG.down = 0;
+    TG.t0 = e.timeStamp || performance.now();
+    TG.trail = [[TG.t0, t.clientY]];
+  }, { passive: true });
+  addEventListener('touchmove', (e) => {
+    if (TG.id === null) return;
+    if (e.touches.length !== 1) { TG.id = null; return; }
+    const t = touchOf(e.changedTouches); if (!t) return;
+    const dx = t.clientX - TG.x0, dy = t.clientY - TG.y0;
+    if (!TG.axis && Math.hypot(dx, dy) >= 8) TG.axis = Math.abs(dy) > Math.abs(dx) ? 'y' : 'x';
+    if (TG.axis === 'x') { TG.id = null; return; }                  // sideways: look-around drag (ride.js)
+    TG.up = Math.max(TG.up, -dy); TG.down = Math.max(TG.down, dy);
+    const now = e.timeStamp || performance.now();
+    TG.trail.push([now, t.clientY]);
+    while (TG.trail.length > 2 && now - TG.trail[0][0] > 120) TG.trail.shift();
+    if (TG.axis === 'y' && e.cancelable) e.preventDefault();
+  }, { passive: false });
+  addEventListener('touchend', (e) => {
+    if (TG.id === null) return;
+    const t = touchOf(e.changedTouches); if (!t) return;
+    TG.id = null;
+    if (TG.axis !== 'y') return;
+    const now = e.timeStamp || performance.now();
+    const dy = t.clientY - TG.y0, dx = t.clientX - TG.x0, dir = Math.sign(dy), dist = Math.abs(dy);
+    if (!dir || dist < 1.2 * Math.abs(dx)) return;
+    const [ta, ya] = TG.trail[0];
+    const v = now - ta > 8 ? (t.clientY - ya) / (now - ta) : 0;           // px/ms over the last ~120 ms
+    const reach = dir < 0 ? TG.up : TG.down;
+    if (reach - dist > Math.max(24, 0.25 * reach)) return;                 // pulled back: changed its mind
+    if (Math.sign(v) === -dir && Math.abs(v) > 0.2) return;                // still moving back at release
+    const dur = now - TG.t0;
+    const speed = Math.max(Math.sign(v) === dir ? Math.abs(v) : 0, dur > 0 && dur < 300 ? dist / dur : 0);
+    const far = dist >= Math.max(48, 0.07 * innerHeight);
+    const flick = dist >= 24 && speed >= 0.3;
+    if (!far && !flick) return;
+    const k = Math.max(0, Math.min(N - 1, active - dir));                // finger up = onward
+    if (k !== active) goTo(k); else hint.classList.add('gone');
+  }, { passive: true });
+  addEventListener('touchcancel', () => { TG.id = null; }, { passive: true });
+  // leaving / entering the discrete mode at run time (a pointer attached or removed): the page scroll resumes /
+  // stops storing the position
+  touchMQ.addEventListener?.('change', () => {
+    snapHC = 0;
+    if (root.classList.contains('ride') && !discrete()) requestAnimationFrame(() => { window.scrollTo(0, Math.max(0, active) * snapH()); lastS = Math.max(0, active); });
+  });
   // Resize / rotation: restore the stop progress recorded before the layout changed. (The browser may already
   // have re-snapped scrollY to the same stop in the new layout; rescaling that value again moved the ride.)
   // Only when the snap height really changed (rotation, window resize): the mobile toolbar hiding / showing
@@ -304,7 +380,7 @@ export function initUI({ P, reduced, mode, onWantRide }) {
     const hNow = snapH();
     if (Math.abs(hNow - lastSnapH) < 0.5) return;
     lastSnapH = hNow;
-    if (!root.classList.contains('ride') || lastS === null) return;
+    if (!root.classList.contains('ride') || discrete() || lastS === null) return;
     if (performance.now() - lastScrollT < 200) return;
     let s = navTarget ?? lastS;
     const r = Math.round(s);
@@ -376,7 +452,7 @@ export function initUI({ P, reduced, mode, onWantRide }) {
       root.classList.remove('text'); root.classList.add('ride');
       railW = -1;
       syncToggle();
-      requestAnimationFrame(() => { window.scrollTo(0, cur * snapH()); setActive(cur); });
+      requestAnimationFrame(() => { window.scrollTo(0, discrete() ? 0 : cur * snapH()); setActive(cur); });
       if (ride) ride.resume(); else onWantRide?.();
     }
   }
@@ -401,7 +477,7 @@ export function initUI({ P, reduced, mode, onWantRide }) {
   const pInit = P.has('p') ? Math.max(0, Math.min(1, parseFloat(P.get('p')) || 0)) : null;
   // With ?t (frozen time, used for screenshots) the stop is held without scrolling the document:
   // headless --screenshot does not paint position:fixed layers of a scrolled document.
-  if (root.classList.contains('ride') && !P.has('t')) {
+  if (root.classList.contains('ride') && !P.has('t') && !discrete()) {
     const sInit = pInit !== null ? pInit * (N - 1) : initial;
     sInitial = sInit;
     lastS = sInit;
