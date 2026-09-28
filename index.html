@@ -12,12 +12,50 @@
 <link rel="canonical" href="https://www.chenbao.tech/">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2307060c'/%3E%3Crect x='8' y='12' width='48' height='4' rx='2' fill='%236fe4ff'/%3E%3Crect x='30' y='16' width='4' height='6' fill='%236fe4ff'/%3E%3Crect x='12' y='22' width='40' height='28' rx='8' fill='%23ffb347'/%3E%3Crect x='17' y='28' width='12' height='10' rx='2' fill='%2307060c'/%3E%3Crect x='35' y='28' width='12' height='10' rx='2' fill='%2307060c'/%3E%3C/svg%3E">
 <script data-cfasync="false">
-/* Mode before first paint: ride (3D) | text (plain page) | static (no WebGL: poster + text). JS off = plain page. */
+/* Mode before first paint: ride (3D) | text (plain page) | static (no WebGL: poster + text). JS off = plain page.
+   Pre-flight (before three.js or any 3D asset loads): a device that cannot run the ride smoothly gets the text view
+   with a "try 3D again" notice (class "auto"): no WebGL2 context without a major performance caveat, a software
+   renderer, GPU limits too small for the screen, <= 2 GB memory, Save-Data / prefers-reduced-data, or a
+   verdict stored by an earlier visit whose 3D failed at run time (main.js). ?force3d=1 skips every check, ?nogl=1 and
+   ?text=1 force the plain page. The probe's numbers stay in window.__gpu, its verdict in window.__auto (tests). */
 (function () {
-  var d = document.documentElement, q = new URLSearchParams(location.search);
-  var c = navigator.connection, save = !!(c && c.saveData), mem = navigator.deviceMemory;
-  var nogl = q.get('nogl') === '1' || !window.WebGL2RenderingContext || save || (mem && mem < 2);
-  d.className = 'js ' + (nogl ? 'static text' : (q.get('text') === '1' ? 'text' : 'ride'));
+  var d = document.documentElement, q = new URLSearchParams(location.search), why = '', mode = 'ride', st = null;
+  try {   // {v:'text', why, until}: an earlier run failed | {v:'try', until}: the visitor asked for 3D (skip heuristics)
+    st = JSON.parse(localStorage.getItem('cb3d') || 'null');
+    if (st && !(st.until > Date.now())) { localStorage.removeItem('cb3d'); st = null; }
+  } catch (e) { st = null; }
+  function probe() {
+    var cv = document.createElement('canvas'), gl = null, g = window.__gpu = {}, A = { antialias: false, depth: false, stencil: false, powerPreference: 'high-performance' };
+    try { A.failIfMajorPerformanceCaveat = true; gl = cv.getContext('webgl2', A); } catch (e) { gl = null; }
+    if (!gl) {   // no hardware context: a software fallback exists (caveat) or no WebGL2 at all (static)
+      var sw = null; try { A.failIfMajorPerformanceCaveat = false; sw = document.createElement('canvas').getContext('webgl2', A); } catch (e) { sw = null; }
+      if (sw) { var l0 = sw.getExtension('WEBGL_lose_context'); if (l0) l0.loseContext(); return 'caveat'; }
+      mode = 'static'; return '';
+    }
+    var r = String(gl.getParameter(gl.RENDERER) || '');
+    if (/^(webkit|mozilla)?\s*webgl$|^webkit$/i.test(r)) { var ex = gl.getExtension('WEBGL_debug_renderer_info'); if (ex) r = String(gl.getParameter(ex.UNMASKED_RENDERER_WEBGL) || r); }
+    var vp = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
+    g.renderer = r; g.maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE); g.maxRb = Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE), vp[0], vp[1]);
+    var lose = gl.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext();
+    if (/swiftshader|llvmpipe|softpipe|lavapipe|software|basic render|mesa offscreen|\bwarp\b/i.test(r)) return 'software';
+    if (g.maxTex < 2048 || g.maxRb < Math.max(2048, screen.width, screen.height, innerWidth, innerHeight)) return 'limits';
+    return '';
+  }
+  if (q.get('nogl') === '1' || !window.WebGL2RenderingContext) mode = 'static';
+  else if (q.get('text') === '1') mode = 'text';
+  else if (q.get('force3d') !== '1') {
+    // no core-count rule: iOS WebKit reports a clamped / randomised hardwareConcurrency (2, or 4|8), not the real cores
+    var c = navigator.connection, mem = navigator.deviceMemory;
+    var tried = !!(st && st.v === 'try');   // the visitor asked for 3D: only an impossible context keeps it off
+    if (st && st.v === 'text') why = st.why || 'stored';
+    else if (!tried) {
+      if ((c && c.saveData) || matchMedia('(prefers-reduced-data: reduce)').matches) why = 'data';
+      else if (mem && mem <= 2) why = 'memory';
+    }
+    if (!why) { var p = probe(); if (!tried) why = p; }
+  }
+  window.__auto = why;
+  d.className = 'js ' + (mode === 'static' ? 'static text' : mode === 'text' ? 'text' : why ? 'text auto' : 'ride');
   if (q.get('ui') === '0') d.className += ' no-ui';
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   // watchdog: if the page scripts never start (blocked, old browser), fall back to the plain page

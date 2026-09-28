@@ -23,6 +23,8 @@ const ICON = {
   car: svg('<path d="M2.5 3.5h19M12 3.5v3"/><rect x="4" y="6.5" width="16" height="12" rx="3.5"/><path d="M7.5 10.5h3.5v3.5H7.5zM13 10.5h3.5v3.5H13z" stroke-width="1.6"/>'),
   mouse: svg('<rect x="7" y="3" width="10" height="16" rx="5"/><path class="wheel" d="M12 6.5v3"/>', '0 0 24 22'),
   swipe: svg('<path class="up1" d="M7 12l5-5 5 5"/><path class="up2" d="M7 18l5-5 5 5"/>', '0 0 24 22'),
+  retry: svg('<path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/>'),
+  close: svg('<path d="M6 6l12 12M18 6L6 18"/>'),
 };
 
 const txt = (el) => (el ? el.textContent.replace(/\s+/g, ' ').trim() : '');
@@ -70,7 +72,7 @@ export function readStops() {
   });
 }
 
-export function initUI({ P, reduced, mode, onWantRide }) {
+export function initUI({ P, reduced, onWantRide, onRetry }) {
   const root = document.documentElement;
   window.__uiReady = true;
   const stops = readStops();
@@ -111,7 +113,8 @@ export function initUI({ P, reduced, mode, onWantRide }) {
     d.querySelector('summary')?.addEventListener('click', (e) => { if (root.classList.contains('ride')) e.preventDefault(); });
   }
   syncDisclosures();
-  if (disclosures.length) new MutationObserver(syncDisclosures).observe(root, { attributes: true, attributeFilter: ['class'] });
+  // mode changes (view toggle, 3D fallback): disclosures + which cards are inert follow
+  new MutationObserver(() => { syncDisclosures(); syncInert(); }).observe(root, { attributes: true, attributeFilter: ['class'] });
 
   // ---------- scroll track: one viewport per stop ----------
   const track = $('#track');
@@ -190,6 +193,13 @@ export function initUI({ P, reduced, mode, onWantRide }) {
   const clampS = (s) => Math.max(0, Math.min(N - 1, s));
   function getTargetS() { return discrete() ? clampS(Math.max(0, active)) : clampS(scrollY / snapH()); }
 
+  // Ride mode: every card stays laid out and rasterised (opacity 0 when inactive: switching cards is a compositor
+  // fade, no new raster on the GPU thread at departure); `inert` keeps the inactive ones out of the accessibility
+  // tree, the Tab order and pointer hits. Outside ride mode (text view) nothing is inert.
+  function syncInert() {
+    const isRide = root.classList.contains('ride');
+    for (const s of stops) s.el.inert = isRide && s.i !== active;
+  }
   function setActive(i) {
     if (i === active) return;
     active = i;
@@ -198,6 +208,7 @@ export function initUI({ P, reduced, mode, onWantRide }) {
       s.el.classList.toggle('is-active', on);
       if (on) s.railLink.setAttribute('aria-current', 'step'); else s.railLink.removeAttribute('aria-current');
     }
+    syncInert();
     stNum.textContent = `${pad2(i + 1)}/${pad2(N)}`;
     stName.textContent = stops[i].label;
     prevB.disabled = i === 0; nextB.disabled = i === N - 1;
@@ -264,10 +275,15 @@ export function initUI({ P, reduced, mode, onWantRide }) {
 
   // ---------- mouse wheel / trackpad: one flick = one stop, at once ----------
   // With native scrolling a few wheel notches were snapped back to the stop (nothing happened), and a fast spin
-  // could park the car between stations. In ride mode the wheel is taken over: a gesture moves exactly one stop;
-  // holding a spinning wheel keeps stepping (one stop / 0.4 s). A card or station list that can still scroll in
-  // the wheel's direction scrolls natively first; a gesture that started there never jumps stops.
-  const W = { last: 0, stepT: -1e9, armed: true, acc: 0, prevAbs: 0, dir: 0, inner: false };
+  // could park the car between stations. In ride mode the wheel is taken over: one gesture (an event stream without
+  // a 200 ms pause) moves exactly one stop, however strong the flick or however long a free-spinning wheel or a
+  // trackpad's inertia keeps sending events. The one exception is a new swipe on a trackpad whose inertia is still
+  // coasting (no pause in between): the input speed has stayed well below its peak for a while since the step and
+  // then rises again. Speed, not single deltas: it is smoothed over ~60 ms of input time (e.timeStamp), so one uneven
+  // event of a smooth stream, or the big coalesced delta Chrome delivers after a long task on the page, reads as the
+  // same flick. A card or station list that can still scroll in the wheel's direction scrolls natively first; a
+  // gesture that started there never jumps stops.
+  const W = { last: 0, lastTs: -1e9, stepT: -1e9, armed: true, acc: 0, dir: 0, inner: false, v: 0, peak: 0, lowT: -1, vmin: 0 };
   const canScroll = (el, dy) => {
     for (let n = el; n && n !== document.body && n !== root; n = n.parentElement) {
       if (n.scrollHeight <= n.clientHeight + 1) continue;
@@ -282,21 +298,34 @@ export function initUI({ P, reduced, mode, onWantRide }) {
     const dx = e.deltaX;
     if (e.deltaMode === 1) dy *= 40; else if (e.deltaMode === 2) dy *= innerHeight;
     if (Math.abs(dy) <= Math.abs(dx) * (e.deltaMode ? 40 : 1)) return;        // sideways: not ours
-    const now = performance.now(), gap = now - W.last, a = Math.abs(dy), dir = Math.sign(dy);
-    W.last = now;
-    if (gap > 200) { W.armed = true; W.acc = 0; W.inner = false; }            // a new gesture
-    else if (dir !== W.dir && W.dir !== 0 && !W.inner) { W.armed = true; W.acc = 0; }   // changed its mind
-    else if (!W.armed && !W.inner && now - W.stepT > 400 &&
-      (((e.deltaMode !== 0 || (Number.isInteger(dy) && a >= 50)) && a >= 0.95 * W.prevAbs) ||   // wheel still spinning (steady notches; a coasting trackpad decays)
-       (a > 2.2 * W.prevAbs && a > 12))) { W.armed = true; W.acc = 0; }      // fresh swipe on a coasting trackpad
-    W.prevAbs = a; W.dir = dir;
+    const now = performance.now(), a = Math.abs(dy), dir = Math.sign(dy);
+    // input time: the event's own timestamp (when the wheel moved), where the browser gives a sane one
+    const ts = e.timeStamp > 0 && e.timeStamp <= now + 1 && now - e.timeStamp < 5000 ? e.timeStamp : now;
+    // A pause in the input starts a new gesture, but only if both clocks show it: after a long task the queued
+    // events arrive late (a gap in handler time, none in input time), then coalesced into one delta stamped with
+    // the newest input (a gap in input time, none in handler time).
+    const gap = Math.min(now - W.last, ts - W.lastTs), dts = Math.min(1000, Math.max(1, ts - W.lastTs));
+    W.last = now; W.lastTs = ts;
+    if (gap > 200) { W.armed = true; W.acc = 0; W.inner = false; W.v = a / 16; }   // a new gesture
+    else {
+      W.v += (a / dts - W.v) * (1 - Math.exp(-dts / 60));                 // px/ms, over the time this delta covers
+      if (dir !== W.dir && W.dir !== 0 && !W.inner) { W.armed = true; W.acc = 0; }   // changed its mind
+      else if (!W.armed && !W.inner) {
+        if (W.lowT >= 0 && ts - W.lowT >= 100 && ts - W.stepT > 300 && W.v >= Math.max(0.5, 3 * W.vmin)) {
+          W.armed = true; W.acc = 0;                                      // below a quarter of the peak for 100 ms, then up again: a fresh swipe
+        } else if (W.v < 0.25 * W.peak) {
+          if (W.lowT < 0) { W.lowT = ts; W.vmin = W.v; } else W.vmin = Math.min(W.vmin, W.v);
+        } else { W.lowT = -1; W.peak = Math.max(W.peak, W.v); }           // still the same flick: follow its peak
+      }
+    }
+    W.dir = dir;
     const t = e.target instanceof Element ? e.target : null;
     if (t && canScroll(t, dy)) { if (gap > 200 || W.inner) W.inner = true; if (W.inner) return; }
     e.preventDefault();
     if (W.inner || !W.armed) return;
     W.acc += dy;
     if (Math.abs(W.acc) < 24) return;
-    W.armed = false; W.acc = 0; W.stepT = now;
+    W.armed = false; W.acc = 0; W.stepT = ts; W.peak = W.v; W.lowT = -1;
     const k = Math.max(0, Math.min(N - 1, active + dir));
     if (k !== active) goTo(k); else if (hint) hint.classList.add('gone');
   }, { passive: false });
@@ -439,17 +468,18 @@ export function initUI({ P, reduced, mode, onWantRide }) {
     toggle.setAttribute('aria-label', isText ? '3D view' : 'Text view');
   }
   toggle.addEventListener('click', () => setText(!root.classList.contains('text')));
-  function setText(on) {
+  function setText(on, { now = false } = {}) {
     const cur = Math.max(0, active);
     snapHC = 0;
     if (on) {
       ride?.pause();
       root.classList.remove('ride'); root.classList.add('text');
       syncToggle();
-      requestAnimationFrame(() => {
-        if (cur > 0) stops[cur].el.scrollIntoView({ block: 'start' }); else window.scrollTo(0, 0);
-      });
+      // the plain page opens at the section of the stop the visitor was at (now: inside a view transition)
+      const place = () => { if (cur > 0) stops[cur].el.scrollIntoView({ block: 'start' }); else window.scrollTo(0, 0); };
+      if (now) place(); else requestAnimationFrame(place);
     } else {
+      if (root.classList.contains('auto')) onRetry?.();     // the automatic text view: "try 3D again"
       root.classList.remove('text'); root.classList.add('ride');
       railW = -1;
       syncToggle();
@@ -457,6 +487,24 @@ export function initUI({ P, reduced, mode, onWantRide }) {
       if (ride) ride.resume(); else onWantRide?.();
     }
   }
+
+  // ---------- automatic text version: a small notice that offers the 3D again (icon + "Try 3D again", dismissable;
+  // it fades after 12 s unless hovered / focused; the view toggle keeps offering the same) ----------
+  const noteBtn = h('button', { type: 'button', class: 'retry' });
+  noteBtn.innerHTML = ICON.retry;
+  noteBtn.append(h('span', { text: 'Try 3D again' }));
+  const noteX = h('button', { type: 'button', class: 'x', 'aria-label': 'Dismiss' });
+  noteX.innerHTML = ICON.close;
+  const note = h('div', { id: 'auto-note', role: 'status' }, noteBtn, noteX);
+  uiRoot.append(note);
+  let noteT = 0;
+  const noteBusy = () => note.matches(':hover, :focus-within');
+  function fadeNote() { clearTimeout(noteT); noteT = setTimeout(() => { if (noteBusy()) fadeNote(); else hideAutoNote(); }, 12000); }
+  function showAutoNote() { note.hidden = false; note.classList.add('on'); note.classList.remove('gone'); fadeNote(); }
+  function hideAutoNote() { clearTimeout(noteT); note.classList.add('gone'); note.classList.remove('on'); }
+  note.hidden = true;
+  noteBtn.addEventListener('click', () => { hideAutoNote(); setText(false); });
+  noteX.addEventListener('click', hideAutoNote);
   syncToggle();
 
   // ---------- initial position from URL (?stop= index|id, ?p= 0..1) ----------
@@ -486,29 +534,25 @@ export function initUI({ P, reduced, mode, onWantRide }) {
     requestAnimationFrame(() => window.scrollTo(0, sInit * snapH()));
   }
   setActive(initial);
-  // Warm-up: draw every card once (invisibly) while the 3D is still loading, so the first switch to a card does
-  // not rasterise it and compile Skia's blur/text shaders on the GPU thread in the middle of a departing frame.
-  if (root.classList.contains('ride')) {
-    root.classList.add('warm-cards');
-    requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('warm-cards'))));
-  }
 
   // ---------- ride state -> rail car marker, kicker state, dock progress ----------
   let lastState = '';
-  let railW = -1;
-  addEventListener('resize', () => { railW = -1; });
+  let railW = -1, lastCarX = NaN, lastProg = NaN;
+  addEventListener('resize', () => { railW = -1; lastCarX = NaN; });
   function onRideState(st) {
-    // st: { s (actual stop progress, float), moving (bool), atStop (index|-1), doorU }
+    // st: { s (actual stop progress, float), moving (bool), atStop (index|-1), doorU, v (m/s) }
     const x = N > 1 ? st.s / (N - 1) : 0;
     if (railW < 0) railW = railList.clientWidth;
-    if (railW) railCar.style.transform = `translateX(${(railW / N) * (0.5 + clampS(st.s))}px)`;
-    progI.style.transform = `scaleX(${Math.max(0.001, x)})`;
-    const key = `${active}|${st.atStop === active ? 'now' : 'next'}`;
+    const cx = Math.round((railW / N) * (0.5 + clampS(st.s)) * 10) / 10;
+    if (railW && cx !== lastCarX) { lastCarX = cx; railCar.style.transform = `translateX(${cx}px)`; }
+    const pv = Math.max(0.001, x);
+    if (pv !== lastProg) { lastProg = pv; progI.style.transform = `scaleX(${pv})`; }
+    const now = st.atStop === active;
+    const key = active * 2 + (now ? 1 : 0);
     if (key !== lastState) {
       lastState = key;
       const sEl = stops[active]?.kicker.querySelector('.state');
       if (sEl) {
-        const now = st.atStop === active;
         sEl.textContent = now ? '●' : '▸';
         sEl.classList.toggle('moving', !now);
       }
@@ -518,7 +562,7 @@ export function initUI({ P, reduced, mode, onWantRide }) {
   function setDebug(text) { if (debugEl) debugEl.textContent = text; }
 
   return {
-    stops, N, getTargetS, goTo, onRideState, setDebug,
+    stops, N, getTargetS, goTo, onRideState, setDebug, setText, showAutoNote, hideAutoNote,
     get locked() { return lockedByParam && !userMoved; },
     initial, pInit,
     attachRide(r) {
@@ -526,6 +570,7 @@ export function initUI({ P, reduced, mode, onWantRide }) {
       // the visitor may have switched to Text view while the 3D was still loading
       if (!root.classList.contains('ride')) r.pause();
     },
+    detachRide(r) { if (ride === r) ride = null; },
     hologramClicked(i) {
       if (i !== active) { goTo(i); return; }
       const link = stops[i].links[0];

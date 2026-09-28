@@ -259,16 +259,14 @@ html.ride main#content [data-stop] {
   position: absolute; left: 0; bottom: 0; width: 100%; margin: 0;
   max-height: min(56vh, 520px, calc(100vh - var(--id-bottom, 0px) - 30px)); overflow-y: auto; overscroll-behavior: auto;
   padding: 14px 18px 16px; border-radius: 14px;
-  opacity: 0; visibility: hidden; transform: translateY(14px);
-  transition: opacity 0.35s ease, transform 0.35s ease, visibility 0s linear 0.35s;
+  /* inactive cards stay laid out and rasterised (a composited layer at opacity 0, inert: see ui.js syncInert), so a
+     card switch is a compositor fade instead of a new raster on the GPU thread in the departing frame */
+  opacity: 0; transform: translateY(14px); pointer-events: none; will-change: opacity, transform;
+  transition: opacity 0.35s ease, transform 0.35s ease;
   scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
 }
 html.ride main#content [data-stop]:focus { outline: 2px solid var(--amber); outline-offset: 2px; }
-html.ride.warm-cards main#content [data-stop]:not(.is-active) { visibility: visible; opacity: 0.001; transition: none; }
-html.ride main#content [data-stop].is-active {
-  opacity: 1; visibility: visible; transform: none;
-  transition: opacity 0.35s ease, transform 0.35s ease, visibility 0s;
-}
+html.ride main#content [data-stop].is-active { opacity: 1; transform: none; pointer-events: auto; }
 /* touch: a card's own scroll never chains to the (non-scrolling) page */
 @media (pointer: coarse) { html.ride main#content [data-stop] { overscroll-behavior: contain; } }
 html.ride main#content section { padding-top: 14px; }
@@ -276,7 +274,7 @@ html.ride .kicker {
   display: flex; align-items: center; gap: 8px; margin: 0 0 8px;
   font: 500 11.5px/1.2 var(--f-mono); letter-spacing: 0.06em; color: var(--amber);
 }
-html.ride .kicker .state { padding: 2px 6px; border-radius: 4px; background: rgba(255, 179, 71, 0.16); }
+html.ride .kicker .state { padding: 2px 6px; border-radius: 4px; background: rgba(255, 179, 71, 0.16); will-change: transform; }
 html.ride .kicker .state.moving { background: rgba(111, 228, 255, 0.14); color: var(--cyan); }
 html.ride #content h2 { margin: 0 0 8px; font-size: 18px; }
 html.ride #content h2::after { display: none; }
@@ -317,12 +315,19 @@ html.ride #ride-ui { display: block; }
   display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 8px 2px 4px;
   color: var(--ink-dim); text-decoration: none; min-width: 0;
 }
-#rail .dot { width: 11px; height: 11px; border-radius: 50%; background: #0b0c14; border: 2px solid rgba(255, 255, 255, 0.55); transition: transform 0.25s, background 0.25s, border-color 0.25s; z-index: 1; }
+#rail .dot { position: relative; width: 11px; height: 11px; border-radius: 50%; background: #0b0c14; border: 2px solid rgba(255, 255, 255, 0.55); transition: transform 0.25s, border-color 0.25s; z-index: 1; will-change: transform; }
+/* the current stop's lit dot is an overlay that cross-fades (opacity: compositor only). A colour transition on the
+   dot itself repainted and re-rasterised it every frame for 0.25 s right at departure. */
+#rail .dot::after {
+  content: ""; position: absolute; inset: -2px; border-radius: 50%; background: var(--amber);
+  box-shadow: 0 0 12px rgba(255, 179, 71, 0.8); opacity: 0; transition: opacity 0.25s; will-change: opacity;
+}
 /* labels = the page's headings / title prefixes as written; a long one wraps (never cut off) */
 #rail .lbl { font: 600 12.5px/1.1 var(--f-sign); letter-spacing: 0.02em; text-align: center; max-width: 100%; }
 #rail a:hover .lbl, #rail a[aria-current="step"] .lbl { color: #fff; }
 #rail a:hover .dot { border-color: var(--cyan); }
-#rail a[aria-current="step"] .dot { background: var(--amber); border-color: var(--amber); transform: scale(1.25); box-shadow: 0 0 12px rgba(255, 179, 71, 0.8); }
+#rail a[aria-current="step"] .dot { transform: scale(1.25); }
+#rail a[aria-current="step"] .dot::after { opacity: 1; }
 #rail .car {
   position: absolute; top: 11px; left: 0; width: 22px; height: 11px; margin-left: -11px; border-radius: 6px;
   background: #fff; box-shadow: 0 0 10px rgba(111, 228, 255, 0.9), 0 0 2px #fff; z-index: 2; pointer-events: none;
@@ -352,7 +357,8 @@ html.ride #ride-ui { display: block; }
 #hint .up2 { animation: hint-up 1.6s ease-in-out 0.2s infinite; }
 @keyframes hint-wheel { 0%, 20% { transform: translateY(0); opacity: 1; } 70% { transform: translateY(3px); opacity: 0.2; } 100% { transform: translateY(0); opacity: 1; } }
 @keyframes hint-up { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
-#hint.gone { opacity: 0; }
+#hint.gone { opacity: 0; visibility: hidden; transition: opacity 0.6s, visibility 0s 0.6s; }
+#hint.gone .ico * { animation-play-state: paused; }
 #dock { display: none; }
 
 #debug {
@@ -363,6 +369,27 @@ html.ride #ride-ui { display: block; }
 html.no-ui #identity, html.no-ui:not(.ride) main#content, html.no-ui #ride-ui { display: none !important; }
 html.ride.no-ui main#content, html.ride.no-ui main#content * { visibility: hidden !important; pointer-events: none !important; }
 html.ride.no-ui #stage::after { display: none; }
+
+/* automatic text version (html.auto, main.js): a small notice with "Try 3D again" + dismiss, bottom right */
+#auto-note { display: none; }
+html.text #auto-note.on, html.text #auto-note.gone {
+  position: fixed; z-index: 8; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: 2px; padding: 3px;
+  border-radius: 999px; background: #0c0d16; border: 1px solid var(--line-strong);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); transition: opacity 0.5s, transform 0.5s;
+}
+html.text #auto-note.gone { opacity: 0; transform: translateY(8px); pointer-events: none; visibility: hidden; transition: opacity 0.5s, transform 0.5s, visibility 0s 0.5s; }
+#auto-note button {
+  appearance: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px;
+  border: 0; border-radius: 999px; background: transparent; color: var(--ink); cursor: pointer;
+  font: 600 15px/1 var(--f-sign); letter-spacing: 0.02em;
+}
+#auto-note .retry { padding: 0 16px 0 13px; background: rgba(111, 228, 255, 0.1); color: #fff; }
+#auto-note .retry:hover { background: rgba(111, 228, 255, 0.2); }
+#auto-note .x { width: 44px; color: var(--ink-dim); }
+#auto-note .x:hover { color: #fff; }
+#auto-note .ico { width: 18px; height: 18px; }
+#auto-note .x .ico { width: 16px; height: 16px; }
 
 /* text view toggle is also shown on the plain page when WebGL exists */
 html.text #ride-ui { display: block; }
@@ -474,8 +501,8 @@ html.static #tools { display: none; }
 
   #rail { overscroll-behavior: contain; }
   html.rail-open main#content [data-stop].is-active {
-    opacity: 0; visibility: hidden; transform: translateY(24px);
-    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0.2s;
+    opacity: 0; transform: translateY(24px); pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
   }
   html.rail-open #dock { bottom: 0; height: calc(54px + env(safe-area-inset-bottom)); padding-bottom: calc(5px + env(safe-area-inset-bottom)); }
   html.rail-open #rail {

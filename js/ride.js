@@ -104,7 +104,10 @@ function profileSpeed(D) {
 }
 
 // ================================================================= entry
-export async function createRide({ canvas, ui, P, reduced, onReady }) {
+/** createRide({ canvas, ui, P, reduced, force, onReady, onFail }) -> ride API { pause, resume, dispose, ... }.
+ *  onFail(why) asks main.js to switch to the text version: 'lost' (WebGL context lost) or 'slow' (frame times stay
+ *  bad at the lowest quality level; never with force = ?force3d=1). dispose() stops everything and frees the GPU. */
+export async function createRide({ canvas, ui, P, reduced, force = false, signal, onReady, onFail }) {
   const num = (k, d) => (P.has(k) && P.get(k) !== '' && !isNaN(+P.get(k)) ? +P.get(k) : d);
   const frozenT = P.has('t') ? num('t', 0) : null;
   const frozen = frozenT !== null;
@@ -112,13 +115,38 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
   const stops = ui.stops, N = ui.N;
   const coarse = matchMedia('(pointer: coarse)').matches;
   const smallScreen = Math.min(screen.width, screen.height) < 820 || coarse;
+  // every listener this ride adds goes away with it (dispose -> a retry builds a fresh ride)
+  const ac = new AbortController(), sig = { signal: ac.signal }, psig = { passive: true, signal: ac.signal };
+  let disposed = false;
+  let monReset = () => {};   // frame-time guard reset (defined with the loop)
 
   // ------------------------------------------------ renderer
   let renderer;
   try {
     renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: frozen, alpha: false });
   } catch (e) { throw new Error('WebGL unavailable'); }
-  if (!renderer.capabilities.isWebGL2) throw new Error('WebGL2 unavailable');
+  if (!renderer.capabilities.isWebGL2) { renderer.dispose(); throw new Error('WebGL2 unavailable'); }
+  const gl = renderer.getContext();
+  // GPU class (for the starting pixel ratio) and the largest drawable size
+  const gpuName = (() => {
+    let r = String(gl.getParameter(gl.RENDERER) || '');
+    if (/^(webkit|mozilla)?\s*webgl$|^webkit$/i.test(r)) { const ex = gl.getExtension('WEBGL_debug_renderer_info'); if (ex) r = String(gl.getParameter(ex.UNMASKED_RENDERER_WEBGL) || r); }
+    return r;
+  })();
+  const maxDraw = Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE), ...gl.getParameter(gl.MAX_VIEWPORT_DIMS));
+  // the ride hands the page back to the text version if the context goes (driver reset, GPU memory pressure)
+  canvas.addEventListener('webglcontextlost', () => { if (!disposed) onFail?.('lost'); }, sig);
+  // loading steps: if one fails, or main.js gave up meanwhile (signal: load watchdog), release what exists and stop
+  const abandon = () => {
+    if (disposed) return; disposed = true; ac.abort();
+    try { renderer.dispose(); if (!gl.isContextLost()) gl.getExtension('WEBGL_lose_context')?.loseContext(); } catch (e) { /* gone */ }
+  };
+  const need = async (p) => {
+    let v;
+    try { v = await p; } catch (e) { abandon(); throw e; }
+    if (signal?.aborted) { abandon(); throw new Error('abandoned'); }
+    return v;
+  };
   const tm = P.get('tm');
   renderer.toneMapping = tm === 'neutral' ? THREE.NeutralToneMapping : tm === 'agx' ? THREE.AgXToneMapping : THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = num('exposure', 1.0);
@@ -143,7 +171,8 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   const carP = loader.loadAsync('assets/car.glb');
   const layersMetaP = fetch('assets/layers/layers.json').then((r) => { if (!r.ok) throw new Error('layers.json ' + r.status); return r.json(); });
-  const useSmallLayers = smallScreen || (navigator.deviceMemory && navigator.deviceMemory <= 4);
+  // small screens, <= 4 GB, or a GPU whose textures stop below 4096 px: the 2048 px layer set
+  const useSmallLayers = smallScreen || (navigator.deviceMemory && navigator.deviceMemory <= 4) || renderer.capabilities.maxTextureSize < 4096;
   const texLoader = new THREE.TextureLoader();
   // large / HiDPI desktop canvases get the 2x close layer (40 px/m) so its signs stay crisp
   const useHiLayers = !useSmallLayers && innerWidth * Math.min(devicePixelRatio || 1, 2) >= 1800 && renderer.capabilities.maxTextureSize >= 8192;
@@ -152,7 +181,7 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
     loadTex('assets/layers/' + layerFile(L), texLoader).then((tex) => ({ L, tex })))).then((arr) => ({ meta, arr })));
   layersP.catch(() => {});   // awaited below; this only stops an early rejection being reported as unhandled
 
-  const gltf = await carP;
+  const gltf = await need(carP);
   const car = gltf.scene;
   car.position.y = -CAR.pivotY;
   rig.add(car);
@@ -401,9 +430,9 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
     // distance covered in ~0.7 frame at 60 fps; each object becomes a trapezoid of width w + sm (motionSmear)
     const sm = reduced ? 0 : Math.min(1.2, Math.abs(v) * 0.012);
     const kP = PW / (PW + sm), kS = SW / (SW + sm), kL = 0.18 / (0.18 + sm), kH = HW / (HW + sm);
-    pillarSm.set(PW, sm); stripSm.set(SW, sm, 0.12); headSm.set(HW, sm);
+    pillarSm.set(PW, sm); stripSm.set(SW, sm, 0.12); headSm.set(HW, sm);   // strips: dimmer than energy-conserving, or the face washes cyan
     const kA = GB.arm / (GB.arm + sm), kM = MKW / (MKW + sm); armGSm.set(GB.arm, sm); mkSm.set(MKW, sm);
-    const exG = view.eye[0];   // strips: dimmer than energy-conserving, or the face washes cyan
+    const exG = view.eye[0];
     poleMat.opacity = Math.max(0.2, kL);
     for (let i = 0; i < NP; i++) {
       const x = PILLAR_X0 + (K0 + i) * PILLAR_PITCH - ph;
@@ -433,11 +462,13 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
     for (const m of guideMeshes) { m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; }
     // the two nearest lamps sweep cool light through the interior as they pass (x relative to the eye)
     const ex = view.eye[0];
-    const lampXs = [];
-    for (let i = 0; i < NP; i++) lampXs.push(PILLAR_X0 + (K0 + i) * PILLAR_PITCH - ph + LAMP_DX);
-    lampXs.sort((a, b) => Math.abs(a - ex) - Math.abs(b - ex));
+    let n0 = Infinity, n1 = Infinity;           // the two lamp x nearest to the eye (lamps sit on a regular pitch)
+    for (let i = 0; i < NP; i++) {
+      const lx = PILLAR_X0 + (K0 + i) * PILLAR_PITCH - ph + LAMP_DX;
+      if (Math.abs(lx - ex) < Math.abs(n0 - ex)) { n1 = n0; n0 = lx; } else if (Math.abs(lx - ex) < Math.abs(n1 - ex)) n1 = lx;
+    }
     for (let j = 0; j < 2; j++) {
-      const lx = lampXs[j], dx = lx - ex;
+      const lx = j ? n1 : n0, dx = lx - ex;
       sweep[j].position.set(clamp(lx, -5.5, 5.5), 1.5, -0.35);
       sweep[j].intensity = 5.5 * (1 - smooth(4.0, 7.0, Math.abs(lx))) * (0.65 + 0.35 * Math.exp(-(dx * dx) / 6));
     }
@@ -494,7 +525,7 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
   /** Vertical placement + scale of hologram H for view v: centred at the view's anchor elevation, raised so its
    *  bottom edge clears the platform handrail by RAIL_CLEAR deg (the rail is highest in the frame at the panel's
    *  right edge, the largest azimuth), and scaled down if it would then reach the hand loops (HOLO_TOP_EL). */
-  function holoFit(v, H) {
+  function holoFit(v, H, out) {
     const e = v.eye, d = HOLO.dist, az = (v.haz ?? HOLO.az) * DEG;
     const yC0 = e[1] + d * Math.tan((v.hel ?? HOLO.el) * DEG);
     const yMax = e[1] + d * Math.tan(HOLO_TOP_EL * DEG);
@@ -506,7 +537,8 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
       s = Math.min(1, (yMax - yMin) / H.h);
     }
     const half = (H.h * s) / 2;
-    return { s, y: Math.min(Math.max(yC0, yMin + half), yMax - half) };
+    out.s = s; out.y = Math.min(Math.max(yC0, yMin + half), yMax - half);
+    return out;
   }
   const holoTargets = [];
   async function ensureHolo(i) {
@@ -559,12 +591,17 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
   let bloomScale = 1;
   const bloomSetSize = bloom.setSize.bind(bloom);
   bloom.setSize = (w, h) => bloomSetSize(Math.max(1, Math.round(w * bloomScale)), Math.max(1, Math.round(h * bloomScale)));
-  let sceneStats = { calls: 0, tris: 0 };
+  const sceneStats = { calls: 0, tris: 0 };
   const rpRender = renderPass.render.bind(renderPass);
-  renderPass.render = (...a) => { renderer.info.reset(); rpRender(...a); sceneStats = { calls: renderer.info.render.calls, tris: renderer.info.render.triangles }; };
+  renderPass.render = (...a) => { renderer.info.reset(); rpRender(...a); sceneStats.calls = renderer.info.render.calls; sceneStats.tris = renderer.info.render.triangles; };
 
   // ------------------------------------------------ sizing
-  let quality = 0;   // quality steps: 0 full, 1 no bloom, 2 dpr <= 1, 3 dpr 0.75
+  // Pixel ratio: HiDPI desktops with a capable GPU start sharp at DPR 2 (hiDpr); the first quality step drops that to
+  // the 1.5 cap if the GPU does not keep up. Phones / tablets / touch screens stay <= 1.5 (their GPUs are the weak
+  // part and their small screens gain little). Then the quality steps: 0 full, 1 no bloom, 2 dpr <= 1, 3 dpr 0.75.
+  let quality = 0;
+  const weakGpu = /intel|mali|adreno|powervr|videocore|mesa|llvmpipe|swiftshader|software|basic render/i.test(gpuName);
+  let hiDpr = !P.has('dprcap') && !smallScreen && (devicePixelRatio || 1) > 1.5 && !weakGpu && renderer.capabilities.maxTextureSize >= 16384;
   function pickView() {
     const a = innerWidth / innerHeight;
     const v = { ...(a < 0.8 ? CAR.view.phone : a < 1.3 ? CAR.view.tablet : innerHeight <= 500 ? CAR.view.short : CAR.view.desk) };
@@ -611,9 +648,10 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
     view = pickView();
     const portrait = w / h < 0.8;
     bloomScale = portrait || smallScreen ? 0.5 : 1;
-    // HiDPI desktop: DPR 2 costs ~3x the pixels of DPR 1 (measured +220 % frame time); 1.5 with MSAA stays crisp
-    const cap = num('dprcap', 1.5);
-    const dpr = quality >= 3 ? 0.75 : quality >= 2 ? Math.min(1, cap) : Math.min(devicePixelRatio || 1, cap);
+    // DPR 2 costs ~3x the pixels of DPR 1 (measured +220 % frame time): only while the GPU keeps up (hiDpr)
+    const cap = num('dprcap', hiDpr ? 2 : 1.5);
+    let dpr = quality >= 3 ? 0.75 : quality >= 2 ? Math.min(1, cap) : Math.min(devicePixelRatio || 1, cap);
+    dpr = Math.min(dpr, maxDraw / Math.max(w, h, 1));   // never beyond the GPU's largest drawable size
     renderer.setPixelRatio(dpr); renderer.setSize(w, h, false);
     composer.setPixelRatio(dpr); composer.setSize(w, h);
     camera.aspect = w / h;
@@ -638,7 +676,7 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
     railShown = htmlRoot.classList.contains('ride') && !phoneMQ.matches;
   }
   resize();
-  addEventListener('resize', resize);
+  addEventListener('resize', () => { monReset(); resize(); }, sig);
 
   // ------------------------------------------------ look-around input
   const stage = canvas.parentElement;
@@ -655,13 +693,13 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
       if (Math.abs(dx) > 6 && Math.abs(dx) > Math.abs(dy)) dragging.moved = true;
       if (dragging.moved) lookState.ty = clamp(dragging.yaw + (dx / innerWidth) * 70, -CAR.look.yaw, CAR.look.yaw);
     }
-  }, { passive: true });
-  document.documentElement.addEventListener('mouseleave', () => { if (!lookFixed) { lookState.ty = 0; lookState.tp = 0; } });
+  }, psig);
+  document.documentElement.addEventListener('mouseleave', () => { if (!lookFixed) { lookState.ty = 0; lookState.tp = 0; } }, sig);
   stage.addEventListener('pointerdown', (e) => {
     if (e.pointerType !== 'mouse') dragging = { id: e.pointerId, x: e.clientX, y: e.clientY, yaw: lookState.yaw, moved: false };
-  });
+  }, sig);
   const endDrag = (e) => { if (dragging && e.pointerId === dragging.id) { dragging = null; if (!lookFixed) { lookState.ty = 0; lookState.tp = 0; } } };
-  addEventListener('pointerup', endDrag); addEventListener('pointercancel', endDrag);
+  addEventListener('pointerup', endDrag, sig); addEventListener('pointercancel', endDrag, sig);
 
   // hologram picking
   const raycaster = new THREE.Raycaster();
@@ -681,7 +719,7 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
   stage.addEventListener('click', (e) => {
     const H = pick(e.clientX, e.clientY);
     if (H) ui.hologramClicked(H.stop.i);
-  });
+  }, sig);
 
   // ------------------------------------------------ simulation state
   const sim = {
@@ -755,22 +793,30 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
   function run(T) { const dt = 1 / 60; for (let t = 0; t < T - 1e-9; t += dt) step(Math.min(dt, T - t)); }
 
   // ------------------------------------------------ wait for layers + fonts, then first holograms
-  const layerData = await layersP;
+  const layerData = await need(layersP);
   buildLayers(layerData);
-  await fontsP;
+  await need(fontsP);
   routeDisp.draw(''); headerDisp.draw('');
-  board.prefit();
 
   if (frozen && !frozenP) run(frozenT);
   if (frozenP) sim.t = frozenT;
 
   // holograms near the start position (awaited when frozen so screenshots are deterministic)
   const kNear = Math.round(sim.D / SPACING);
+  // Station boards: the ones the car can show first (from the start position to the first stop, and their
+  // neighbours) are drawn now and uploaded with everything else (prewarm); the others once the ride is on screen
+  // and parked (paintLater), long before the car can reach them.
+  {
+    const k0 = clamp(Math.min(kNear, ui.initial) - 1, 0, N - 1), k1 = clamp(Math.max(kNear, ui.initial) + 1, 0, N - 1);
+    for (let k = k0; k <= k1; k++) board.paint(k);
+    board.show(clamp(kNear, 0, N - 1));
+  }
   // Every hologram is built now (hidden): none is drawn to a canvas, uploaded or compiled in the middle of a ride.
   for (let k = 0; k < N; k++) ensureHolo(k);
   const firstReady = Promise.all([kNear - 1, kNear, kNear + 1].filter((k) => k >= 0 && k < N).map((k) => holos.get(k).ready));
-  if (frozen) await firstReady;
-  await prewarm();
+  if (frozen) await need(firstReady);
+  freezeStatic();
+  await need(prewarm());
 
   // ------------------------------------------------ prewarm (before the canvas fades in)
   // Compile every program the ride can need (hidden holograms included) in parallel (KHR_parallel_shader_compile)
@@ -780,12 +826,30 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
     const wait = (p) => Promise.race([p, new Promise((r) => setTimeout(r, 5000))]);
     const quadScene = (mats) => { const s = new THREE.Scene(); for (const m of mats) s.add(new THREE.Mesh(new THREE.PlaneGeometry(), m)); return s; };
     const jobs = [];
+    // parallel compile where the driver offers it (KHR_parallel_shader_compile); otherwise a plain compile now
+    // (asking three for the missing extension would log a warning)
+    const par = renderer.extensions.has('KHR_parallel_shader_compile');
+    const compile = (sc, cam, target = null) => (par ? renderer.compileAsync(sc, cam, target) : (renderer.compile(sc, cam, target), Promise.resolve()));
     try {
       renderer.setRenderTarget(composer.renderTarget1);
-      jobs.push(renderer.compileAsync(scene, camera));
+      jobs.push(compile(scene, camera));
       const bloomMats = [bloom.materialHighPassFilter, ...(bloom.separableBlurMaterials || []), bloom.compositeMaterial].filter(Boolean);
+      // the route display's other material (desktop route diagram) with the ride scene's lights: a program's key
+      // includes the scene's light counts, and one compiled without them was linked again, synchronously, in the
+      // first frame (~50 ms on the load's critical path)
+      jobs.push(compile(quadScene(routeDisp.mats.filter((m) => m !== routeDisp.mesh.material)), camera, scene));
       renderer.setRenderTarget(bloom.renderTargetBright);
-      jobs.push(renderer.compileAsync(quadScene(bloomMats), camera));
+      jobs.push(compile(quadScene(bloomMats), camera));
+      // The output pass (tone mapping + sRGB) sets its shader defines in its first render: set them now (its quad
+      // draw skipped) so that its program is compiled in parallel with the others, not in the first frame.
+      const oq = outPass._fsQuad;
+      if (oq && typeof oq.render === 'function') {
+        const draw = oq.render;
+        oq.render = () => {};
+        try { outPass.render(renderer, null, composer.readBuffer); } finally { oq.render = draw; }
+        renderer.setRenderTarget(null);
+        jobs.push(compile(quadScene([outPass.material]), camera));
+      }
     } catch (e) { /* compile on first use instead */ }
     renderer.setRenderTarget(null);
     const tex = new Set();
@@ -795,14 +859,56 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
         if (m.uniforms) for (const u of Object.values(m.uniforms)) if (u && u.value && u.value.isTexture) tex.add(u.value);
       }
     });
+    board.textures.forEach((t, k) => { if (board.painted(k)) tex.add(t); else tex.delete(t); });
     for (const t of tex) { try { renderer.initTexture(t); } catch (e) { /* uploaded on first use */ } }
+    // The state symbols (● ▸ ›) are outside the sign / mono fonts' subsets: resolve their fallback font here, while
+    // the main thread only waits for the parallel shader compile. Its first use (a system font lookup, ~25-30 ms,
+    // 4x that on a slow phone) used to land in the first departing frame, and then on the load's critical path.
+    {
+      const c = document.createElement('canvas').getContext('2d');
+      for (const f of [`600 58px ${FONT_SIGN}`, `600 31px ${FONT_SIGN}`, `500 11px ${FONT_MONO}`]) { c.font = f; c.measureText('● ▸ › ‹ ▲'); c.fillText('● ▸ › ‹ ▲', 0, 40); }
+    }
     await wait(Promise.all(jobs).catch(() => {}));
   }
 
+  // The remaining station boards: drawn and uploaded one per idle slot while the car is parked with its doors open
+  // and no other stop chosen (a board shows from half-way between two stops; drawing one costs a few ms of text
+  // measuring, more on a slow phone).
+  function paintLater() {
+    const left = [];
+    for (let k = 0; k < N; k++) if (!board.painted(k)) left.push(k);
+    const idle = typeof requestIdleCallback === 'function' ? (f) => requestIdleCallback(f, { timeout: 500 }) : (f) => setTimeout(f, 50);
+    const next = () => {
+      if (disposed || !left.length) return;
+      if (!parkedOpen()) { setTimeout(() => idle(next), 250); return; }      // not while departing / moving
+      const kC = Math.round(sim.D / SPACING);
+      let j = 0;
+      for (let i = 1; i < left.length; i++) if (Math.abs(left[i] - kC) < Math.abs(left[j] - kC)) j = i;
+      const k = left.splice(j, 1)[0];
+      if (board.paint(k)) { try { renderer.initTexture(board.textures[k]); } catch (e) { /* uploaded on first use */ } }
+      idle(next);
+    };
+    if (left.length && !frozen) idle(next);         // frozen (?t=): the car never leaves its place
+  }
+
+  // ------------------------------------------------ static objects
+  // Most of the scene never moves relative to its parent (car parts, platforms, layers, instanced outside objects —
+  // their instances move, not the object). Compose their local matrices once instead of every frame (three still
+  // recomputes world matrices below the swaying rig). Kept live: the rig, the camera, lights and boards that move,
+  // hologram groups and every node the door animation drives.
+  function freezeStatic() {
+    const live = new Set([scene, rig, camera, board.group, platLight, ...sweep]);
+    for (const H of holos.values()) live.add(H.group);
+    if (clip) for (const tr of clip.tracks) { const o = THREE.PropertyBinding.findNode(car, THREE.PropertyBinding.parseTrackName(tr.name).nodeName); if (o) live.add(o); }
+    scene.traverse((o) => { if (!live.has(o)) { o.updateMatrix(); o.matrixAutoUpdate = false; } });
+  }
+
   // ------------------------------------------------ per-frame apply
-  let dispKey = '', lastOutKey = '', primeT = -1e9;
+  let primeT = -1e9, lastOutD = NaN, lastOutV = NaN, lastOutE = NaN, mapKey = -1, routeKey = -1, headKey = -1;
   const camBase = new THREE.Vector3();
   const eyeW = new THREE.Vector3();
+  const fit = { s: 1, y: 0 };
+  const rideState = { s: 0, moving: false, atStop: -1, doorU: 0, v: 0 };
   function apply(t, dt) {
     const speedN = clamp(Math.abs(sim.v) / 45, 0, 1);
     const accN = clamp(Math.abs(sim.acc) / ACC, 0, 1);
@@ -818,12 +924,10 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
     const wl = 6.0;
     if (!lookFixed) {
       const e = Math.exp(-wl * dt);
-      const spring = (x, v, target) => {
-        const x0 = x - target, c = v + wl * x0;
-        return [target + (x0 + c * dt) * e, (v - wl * c * dt) * e];
-      };
-      [lookState.yaw, lookState.vy] = spring(lookState.yaw, lookState.vy, lookState.ty);
-      [lookState.pitch, lookState.vp] = spring(lookState.pitch, lookState.vp, lookState.tp);
+      let x0 = lookState.yaw - lookState.ty, c = lookState.vy + wl * x0;
+      lookState.yaw = lookState.ty + (x0 + c * dt) * e; lookState.vy = (lookState.vy - wl * c * dt) * e;
+      x0 = lookState.pitch - lookState.tp; c = lookState.vp + wl * x0;
+      lookState.pitch = lookState.tp + (x0 + c * dt) * e; lookState.vp = (lookState.vp - wl * c * dt) * e;
     }
     const e = view.eye;
     camBase.set(e[0], e[1], e[2]);
@@ -843,24 +947,28 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
       mat.uniforms.offset.value = ((sim.D / L.tileWidthM) % 1 + 1) % 1;
       mat.uniforms.blur.value = Math.min(0.012, (Math.abs(sim.v) / 80) / L.tileWidthM);
     }
-    const outKey = sim.D + '|' + sim.v + '|' + view.eye[0];
-    if (outKey !== lastOutKey) { lastOutKey = outKey; placeOutside(sim.D, sim.v); placePlatforms(sim.D); }
+    if (sim.D !== lastOutD || sim.v !== lastOutV || view.eye[0] !== lastOutE) {
+      lastOutD = sim.D; lastOutV = sim.v; lastOutE = view.eye[0];
+      placeOutside(sim.D, sim.v); placePlatforms(sim.D);
+    }
 
     // holograms: anchored to their stop, fade/drift in as the car approaches
     const sNow = sim.D / SPACING;
     const kN = Math.round(sNow);
-    for (const k of [kN - 1, kN, kN + 1]) if (k >= 0 && k < N && !holos.has(k)) ensureHolo(k);
+    for (let k = kN - 1; k <= kN + 1; k++) if (k >= 0 && k < N && !holos.has(k)) ensureHolo(k);
     camera.getWorldPosition(eyeW);
     const anchor = anchorFor(view);
     let spill = 0;
-    for (const [k, H] of holos) {
+    for (let k = 0; k < N; k++) {
+      const H = holos.get(k);
+      if (!H) continue;
       const dd = sim.D - Dstop(k);
       const near = 1 - smooth(6, 64, Math.abs(dd));
       const atStopBoost = stopAtD(sim.D) === k ? 1 : 0;
       const appear = Math.max(near * near, atStopBoost);
       H.group.visible = appear > 0.003 && Math.abs(dd) < 140;
       if (!H.group.visible) { H.setActive(false); continue; }
-      const fit = holoFit(view, H);
+      holoFit(view, H, fit);
       H.group.scale.setScalar(fit.s);
       H.group.position.set(anchor.x - dd, fit.y + (1 - near) * 2.5, anchor.z);
       H.group.lookAt(eyeW);
@@ -892,28 +1000,32 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
       const kPass = clamp(fwd ? Math.ceil(sNow - 1e-3) : Math.floor(sNow + 1e-3), 0, N - 1);
       if (kPass !== dirNext && (fwd ? kPass < dirNext : kPass > dirNext)) passing = kPass;
     }
+    // Displays: canvas redraws (texture uploads) only when their content changes. The desktop route diagram's
+    // moving parts (progress bar, car marker) are drawn by its shader from uniforms; its canvas (line, stop dots)
+    // changes only when the car reaches, leaves or passes a stop (it was redrawn ~40x per stop = 67x/s at speed).
     const lab = (k) => stops[k].label;
-    let routeText, headText;
-    if (at >= 0 && sim.v === 0) {
-      routeText = `●  ${lab(at)}` + (at < N - 1 ? `        ▸  ${lab(at + 1)}` : '');
-      headText = `● ${lab(at)}`;
+    const parked = at >= 0 && sim.v === 0;
+    const hk = parked ? at : 100 + dirNext;
+    if (hk !== headKey) { headKey = hk; headerDisp.draw(parked ? `● ${lab(at)}` : `▸ ${lab(dirNext)}`); }
+    if (railShown) {
+      const atS = parked ? at : -1, mk = (atS + 1) * 64 + clamp(Math.ceil(sNow), 0, N);
+      if (mk !== mapKey) { mapKey = mk; routeKey = -1; routeDisp.drawMap(N, sNow, atS); }
+      routeDisp.setMapCar(N, sNow, atS);
     } else {
-      routeText = (passing >= 0 ? `›  ${lab(passing)}        ` : '') + `▸  ${lab(dirNext)}`;
-      headText = `▸ ${lab(dirNext)}`;
-    }
-    const sQ = Math.round(sNow * 40) / 40;
-    const key = (railShown ? `map|${sQ}|${at}|${sim.v === 0}` : routeText) + '|' + headText;
-    if (key !== dispKey) {
-      dispKey = key;
-      if (railShown) routeDisp.drawMap(N, sQ, at >= 0 && sim.v === 0 ? at : -1); else routeDisp.draw(routeText);
-      headerDisp.draw(headText);
+      const rk = parked ? at : 1000 + (passing + 1) * 64 + dirNext;
+      if (rk !== routeKey) {
+        routeKey = rk; mapKey = -1;
+        routeDisp.draw(parked ? `●  ${lab(at)}` + (at < N - 1 ? `        ▸  ${lab(at + 1)}` : '')
+          : (passing >= 0 ? `›  ${lab(passing)}        ` : '') + `▸  ${lab(dirNext)}`);
+      }
     }
 
-    ui.onRideState({ s: sNow, moving: sim.v !== 0, atStop: at >= 0 && sim.v === 0 ? at : -1, doorU: sim.doorU });
+    rideState.s = sNow; rideState.moving = sim.v !== 0; rideState.atStop = parked ? at : -1; rideState.doorU = sim.doorU; rideState.v = sim.v;
+    ui.onRideState(rideState);
   }
 
   // ------------------------------------------------ loop
-  let running = true, last = performance.now(), liveT = sim.t, fpsAcc = 0, fpsN = 0, fps = 0, lowFor = 0, dbgT = 0;
+  let running = true, last = performance.now(), liveT = sim.t, fps = 0, dbgT = 0;
   let readySent = false;
   // Parked and nothing changing (no input for 1.2 s, car stopped, doors settled, look spring at rest): render at
   // ~60 fps instead of every refresh (164 Hz on a fast monitor). What still moves then (the slow idle sway,
@@ -921,12 +1033,64 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
   const IDLE_MS = 13.5;
   let lastInputT = performance.now(), lastRenderT = -1e9;
   const poke = () => { lastInputT = performance.now(); };
-  for (const ev of ['pointermove', 'pointerdown', 'wheel', 'keydown', 'scroll', 'touchstart', 'resize']) addEventListener(ev, poke, { passive: true });
+  for (const ev of ['pointermove', 'pointerdown', 'wheel', 'keydown', 'scroll', 'touchstart', 'resize']) addEventListener(ev, poke, psig);
   const idleNow = (now) => !frozen && now - lastInputT > 1200 && sim.v === 0 && (sim.doorU === 0 || sim.doorU === 1) &&
     Math.abs(targetD() - sim.D) < 0.01 && Math.abs(lookState.vy) + Math.abs(lookState.vp) < 0.02 &&
     Math.abs(lookState.ty - lookState.yaw) + Math.abs(lookState.tp - lookState.pitch) < 0.02;
+
+  // Frame-time guard: adaptive quality, then the text version. Only frames rendered back to back count (not the one
+  // after an idle-throttle skip, a hidden tab, a pause, a resize or a quality step), from 2 s after the first frame.
+  // Per second of counted time: at DPR 2, below the display's pace (< 85 % of its refresh rate, and never < 50 fps)
+  // twice in a row -> DPR 1.5; then < 27 fps (q0-1) / < 20 fps (q2)
+  // three times in a row, or once < 12 fps -> the next quality step; at the lowest step, < 20 fps four times in a
+  // row, or 3 frames > 250 ms within 5 s -> onFail('slow') (main.js fades to the text version). ?force3d=1 and a
+  // frozen ?t= never fail; 30 fps-capped devices (iOS Low Power Mode) never degrade.
+  // A drop from DPR 2 is not for good: after 10 counted seconds in a row at >= 95 % of the pace (DPR 1.5, full
+  // quality) the next stop tries DPR 2 again (a short burst of GPU contention from another tab or app must not keep
+  // the whole visit at 1.5); after a second drop it waits 30 s, after a third it stays at 1.5.
+  // rAF faster than 240 Hz is not paced by a display (a 360 Hz monitor, or vsync off): 144 Hz stands in for it.
+  const mon = { t: 0, n: 0, low: 0, bad: 0, good: 0, long: [], from: Infinity, skip: true, failed: false };
+  monReset = () => { mon.t = 0; mon.n = 0; mon.low = 0; mon.bad = 0; mon.good = 0; mon.long.length = 0; mon.skip = true; };
+  const hiDprOk = hiDpr;
+  let hiRetry = { left: 2, need: 10 };
+  function stepDown() { monReset(); degrade(); }
+  // display refresh: rAF timestamps are vsync-aligned, so the short end of the tick intervals (skipped ticks included)
+  // is one refresh even while frames take two
+  const ticks = new Float32Array(120); let tickN = 0, lastTick = 0;
+  const refreshHz = () => {
+    if (tickN < 30) return 60;
+    const a = Array.from(ticks.subarray(0, Math.min(tickN, 120))).sort((x, y) => x - y);
+    return 1000 / a[Math.floor(a.length * 0.1)];
+  };
+  function guard(dt, now) {
+    if (frozen || mon.failed || document.visibilityState !== 'visible') return;
+    const lowest = quality >= 3 && !hiDpr;
+    if (lowest && !force && dt > 0.25) {
+      mon.long.push(now);
+      while (now - mon.long[0] > 5000) mon.long.shift();
+      if (mon.long.length >= 3) { mon.failed = true; onFail?.('slow'); return; }
+    }
+    mon.t += dt; mon.n++;
+    if (mon.t < 1) return;
+    fps = mon.n / mon.t; mon.t = 0; mon.n = 0;
+    const hz = refreshHz(), pace = hz > 240 ? 144 : hz;
+    if (hiDpr) {
+      mon.low = fps < Math.max(50, 0.85 * pace) ? mon.low + 1 : 0;
+      if (mon.low >= 2 || fps < 12) { hiDpr = false; stepDown(); }
+    } else if (quality < 3) {
+      mon.low = fps < (quality < 2 ? 27 : 20) ? mon.low + 1 : 0;
+      if (mon.low >= 3 || fps < 12) { quality++; stepDown(); }
+      else if (hiDprOk && quality === 0 && hiRetry.left > 0) mon.good = fps >= 0.95 * pace ? mon.good + 1 : 0;
+    } else if (!force) {
+      mon.bad = fps < 20 ? mon.bad + 1 : 0;
+      if (mon.bad >= 4) { mon.failed = true; onFail?.('slow'); }
+    }
+  }
+
   function frame(now) {
-    if (readySent && now - lastRenderT < IDLE_MS && idleNow(now)) return;   // skip this refresh (dt accumulates)
+    if (lastTick) { const d = now - lastTick; if (d > 2 && d < 50) ticks[tickN++ % 120] = d; }
+    lastTick = now;
+    if (readySent && now - lastRenderT < IDLE_MS && idleNow(now)) { mon.skip = true; return; }   // skip this refresh (dt accumulates)
     lastRenderT = now;
     const rawDt = Math.max(0, (now - last) / 1000); last = now;
     const dt = Math.min(0.1, rawDt);
@@ -939,17 +1103,10 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
     }
     renderer.info.reset();
     composer.render(dt);
-    if (!readySent) { readySent = true; requestAnimationFrame(() => onReady && onReady()); }
-    // fps + auto-degrade (never while frozen)
-    fpsAcc += rawDt; fpsN++;
-    if (fpsAcc >= 1) {
-      fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0;
-      // 30 fps-capped devices (e.g. iOS Low Power Mode) are fine; only degrade when clearly struggling
-      if (!frozen && document.visibilityState === 'visible') {
-        lowFor = fps < (quality < 2 ? 27 : 20) ? lowFor + 1 : 0;
-        if (lowFor >= 3 && quality < 3) { quality++; lowFor = 0; degrade(); }
-      }
-    }
+    if (!readySent) { readySent = true; mon.from = now + 2000; requestAnimationFrame(() => { if (!disposed) { onReady?.(); paintLater(); } }); }
+    if (mon.skip) mon.skip = false; else if (now >= mon.from) guard(rawDt, now);
+    // back to DPR 2 (see the guard), while parked: the render targets are reallocated in this frame
+    if (mon.good >= hiRetry.need && sim.v === 0) { hiDpr = true; hiRetry = { left: hiRetry.left - 1, need: 30 }; stepDown(); }
     if (debug && now - dbgT > 500) { dbgT = now; ui.setDebug(debugText()); }
   }
   function degrade() {
@@ -969,7 +1126,7 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
     const media = sel(/assets\/(papers|projects)\//);
     const three = sel(/three@/);
     const lines = [
-      `fps ${frozen ? '(frozen t)' : fps.toFixed(0)} · dpr ${renderer.getPixelRatio().toFixed(2)} · q${quality}${quality >= 1 ? ' (bloom off)' : ''}`,
+      `fps ${frozen ? '(frozen t)' : fps.toFixed(0)} · dpr ${renderer.getPixelRatio().toFixed(2)}${hiDpr ? ' (hi)' : ''} · q${quality}${quality >= 1 ? ' (bloom off)' : ''}`,
       `scene draw calls ${sceneStats.calls} · tris ${(sceneStats.tris / 1000).toFixed(1)}k`,
       `frame total calls ${i.render.calls} (incl. post) · tex ${i.memory.textures} · geo ${i.memory.geometries}`,
       `D ${sim.D.toFixed(1)} m · v ${sim.v.toFixed(1)} m/s · door ${sim.doorU.toFixed(2)}`,
@@ -984,12 +1141,50 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
   }
   renderer.setAnimationLoop(frame);
   document.addEventListener('visibilitychange', () => {
+    monReset(); lastTick = 0;
     if (document.hidden) renderer.setAnimationLoop(null); else if (running) { last = performance.now(); renderer.setAnimationLoop(frame); }
-  });
+  }, sig);
+
+  /** stop for good and give the GPU memory back: loop, listeners, videos, textures (+ their ImageBitmaps), buffers,
+   *  render targets, then the context itself */
+  function dispose() {
+    if (disposed) return;
+    disposed = true; running = false;
+    renderer.setAnimationLoop(null);
+    ac.abort();
+    stage.style.cursor = '';
+    for (const H of holos.values()) H.dispose();
+    document.getElementById('holo-media')?.remove();
+    mixer.stopAllAction();
+    const seen = new Set();
+    const free = (t) => {
+      if (!t || !t.isTexture || seen.has(t)) return;
+      seen.add(t);
+      const img = t.image;
+      t.dispose();
+      if (img && typeof ImageBitmap !== 'undefined' && img instanceof ImageBitmap) img.close();
+    };
+    scene.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.isInstancedMesh) o.dispose();
+      for (const m of o.material ? [].concat(o.material) : []) {
+        for (const v of Object.values(m)) free(v);
+        if (m.uniforms) for (const u of Object.values(m.uniforms)) free(u && u.value);
+        m.dispose();
+      }
+    });
+    for (const m of routeDisp.mats) m.dispose();
+    for (const t of board.textures) free(t);
+    free(scene.environment); free(pillarTex); free(white1);
+    try { composer.dispose(); bloom.dispose(); composerRT.dispose(); } catch (e) { /* older addons */ }
+    renderer.dispose();
+    if (!gl.isContextLost()) gl.getExtension('WEBGL_lose_context')?.loseContext();
+  }
 
   return {
     pause() { running = false; renderer.setAnimationLoop(null); for (const H of holos.values()) H.setActive(false); },
-    resume() { if (running) return; running = true; last = performance.now(); resize(); renderer.setAnimationLoop(frame); },
+    resume() { if (running || disposed) return; running = true; monReset(); last = performance.now(); resize(); renderer.setAnimationLoop(frame); },
+    dispose,
     get state() { return { ...sim }; },
     get debugScene() { return debug ? scene : null; },
     get holoRect() {
@@ -1011,10 +1206,20 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
     const c = document.createElement('canvas'); c.width = spec.px[0]; c.height = spec.px[1];
     const ctx = c.getContext('2d');
     const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = Math.min(8, maxAniso);
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(spec.size[0], spec.size[1]),
-      new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    const off = { toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 };
+    const textMat = new THREE.MeshBasicMaterial({ map: tex, ...off });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(spec.size[0], spec.size[1]), textMat);
     mesh.position.set(...spec.pos);
+    // route diagram (desktop): the canvas holds the static part, the shader adds the progress bar + the car marker
+    const MX0 = 110, MX1 = c.width - 110, MY = c.height / 2;
+    const mapU = kind === 'route' ? {
+      map: { value: tex }, size: { value: new THREE.Vector2(c.width, c.height) }, x0: { value: MX0 }, x1: { value: MX1 }, y: { value: MY },
+      n: { value: 2 }, onK: { value: -1 }, fillX: { value: MX0 }, carOn: { value: 0 },
+      amber: { value: new THREE.Color('#ffb347') }, carCol: { value: new THREE.Color('#f4fbff') },
+    } : null;
+    const mapMat = mapU ? new THREE.ShaderMaterial({ uniforms: mapU, vertexShader: LAYER_VS, fragmentShader: ROUTE_FS, ...off }) : null;
     function draw(text) {
+      mesh.material = textMat;
       const w = c.width, h = c.height;
       ctx.fillStyle = '#07090b'; ctx.fillRect(0, 0, w, h);
       ctx.fillStyle = '#ffb347';
@@ -1033,26 +1238,28 @@ export async function createRide({ canvas, ui, P, reduced, onReady }) {
       }
       tex.needsUpdate = true;
     }
-    /** route diagram without text (n stops, car at stop progress s, `at` = stop the car stands at or -1) */
+    const mapX = (n, k) => MX0 + ((MX1 - MX0) * k) / Math.max(1, n - 1);
+    /** the static part of the text-free route diagram (n stops, car at stop progress s, `at` = stop it stands at or
+     *  -1): line + stop dots (passed ones dimmed amber). Progress bar and car marker: setMapCar (shader uniforms). */
     function drawMap(n, s, at) {
-      const w = c.width, h = c.height, x0 = 110, x1 = w - 110, y = h / 2;
-      const X = (k) => x0 + ((x1 - x0) * k) / Math.max(1, n - 1);
+      mesh.material = mapMat;
+      const w = c.width, h = c.height, y = MY;
       ctx.fillStyle = '#07090b'; ctx.fillRect(0, 0, w, h);
-      const g = ctx.createLinearGradient(x0, 0, x1, 0);
+      const g = ctx.createLinearGradient(MX0, 0, MX1, 0);
       g.addColorStop(0, '#ffb347'); g.addColorStop(0.3, '#ff5ab0'); g.addColorStop(0.7, '#6fe4ff'); g.addColorStop(1, '#ffb347');
-      ctx.globalAlpha = 0.6; ctx.fillStyle = g; ctx.fillRect(x0, y - 2, x1 - x0, 4); ctx.globalAlpha = 1;
-      ctx.fillStyle = '#ffb347'; ctx.fillRect(x0, y - 2, X(s) - x0, 4);
+      ctx.globalAlpha = 0.6; ctx.fillStyle = g; ctx.fillRect(MX0, y - 2, MX1 - MX0, 4); ctx.globalAlpha = 1;
       for (let k = 0; k < n; k++) {
         const on = k === at;
-        ctx.beginPath(); ctx.arc(X(k), y, on ? 10 : 7, 0, 7);
+        ctx.beginPath(); ctx.arc(mapX(n, k), y, on ? 10 : 7, 0, 7);
         ctx.fillStyle = on ? '#ffb347' : k < s ? '#8a5a22' : '#0b0c14'; ctx.fill();
         ctx.lineWidth = 3; ctx.strokeStyle = on ? '#ffd9a0' : '#9aa3b5'; ctx.stroke();
       }
-      if (at < 0) { ctx.fillStyle = '#f4fbff'; ctx.beginPath(); ctx.ellipse(X(s), y, 16, 8, 0, 0, 7); ctx.fill(); }
       ctx.fillStyle = '#ff5ab0'; ctx.beginPath(); ctx.arc(40, y, 6, 0, 7); ctx.arc(w - 40, y, 6, 0, 7); ctx.fill();
       tex.needsUpdate = true;
+      mapU.n.value = n; mapU.onK.value = at;
     }
-    return { mesh, draw, drawMap };
+    function setMapCar(n, s, at) { mapU.fillX.value = mapX(n, s); mapU.carOn.value = at < 0 ? 1 : 0; }
+    return { mesh, draw, drawMap, setMapCar, mats: [textMat, mapMat].filter(Boolean), tex };
   }
 }
 
@@ -1077,6 +1284,31 @@ void main() {
   }
   vec3 col = a > 1e-4 ? acc / a : vec3(0.0);
   gl_FragColor = vec4(col * gain, a);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}`;
+
+// Route diagram (desktop in-car display): the canvas (map) holds the line and the stop dots; this adds what moves —
+// the amber progress bar from the first stop to the car (under the dots, as the canvas used to draw it) and the car
+// marker (a white 16 x 8 px ellipse) — in canvas pixels, anti-aliased with the pixel footprint.
+const ROUTE_FS = /* glsl */`
+uniform sampler2D map; uniform vec2 size; uniform float x0; uniform float x1; uniform float y; uniform float n;
+uniform float onK; uniform float fillX; uniform float carOn; uniform vec3 amber; uniform vec3 carCol;
+varying vec2 vUv;
+void main() {
+  vec2 p = vec2(vUv.x * size.x, (1.0 - vUv.y) * size.y);
+  vec2 fw = max(fwidth(p), vec2(1e-3));
+  vec3 col = texture2D(map, vUv).rgb;
+  float bar = clamp(min(p.x - x0, fillX - p.x) / fw.x + 0.5, 0.0, 1.0) * clamp((2.0 - abs(p.y - y)) / fw.y + 0.5, 0.0, 1.0);
+  float sp = (x1 - x0) / max(1.0, n - 1.0);
+  float k = clamp(floor((p.x - x0) / sp + 0.5), 0.0, n - 1.0);
+  float r = (abs(k - onK) < 0.5 ? 10.0 : 7.0) + 1.5;
+  float dotm = clamp((r - length(p - vec2(x0 + k * sp, y))) / max(fw.x, fw.y) + 0.5, 0.0, 1.0);
+  col = mix(col, amber, bar * (1.0 - dotm));
+  vec2 e = (p - vec2(fillX, y)) / vec2(16.0, 8.0);
+  float car = carOn * clamp((1.0 - length(e)) / max(length(fw / vec2(16.0, 8.0)), 1e-3) + 0.5, 0.0, 1.0);
+  col = mix(col, carCol, car);
+  gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
@@ -1274,47 +1506,48 @@ function platformTextures(maxAniso) {
   return { map, emis };
 }
 
-/** one station name board, redrawn for the nearest stop (stop number + the stop's label as the page writes it) */
+/** one station name board showing the nearest stop (stop number + the stop's label as the page writes it). Every
+ *  stop's face is drawn once (prepare(), after the fonts) and uploaded with the rest; show(k) only swaps textures. */
 function stationBoard(stops, maxAniso) {
   const group = new THREE.Group();
   const BW = 2.6, BH = 0.62, Y0 = 1.3;
-  const c = document.createElement('canvas'); c.width = 1024; c.height = 244;
-  const x = c.getContext('2d');
-  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = Math.min(8, maxAniso);
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(BW, BH), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
+  const texs = stops.map(() => {
+    const c = document.createElement('canvas'); c.width = 1024; c.height = 244;
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = Math.min(8, maxAniso);
+    return t;
+  });
+  const faceMat = new THREE.MeshBasicMaterial({ map: texs[0], toneMapped: false });
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(BW, BH), faceMat);
   face.position.set(0, Y0 + BH / 2, 0.036);
   const dark = new THREE.MeshStandardMaterial({ color: '#15181e', roughness: 0.5, metalness: 0.6, envMapIntensity: 0.4 });
   const frame = new THREE.Mesh(new THREE.BoxGeometry(BW + 0.1, BH + 0.1, 0.06), dark); frame.position.set(0, Y0 + BH / 2, 0);
   const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, Y0, 0.08), dark); post.position.set(0, Y0 / 2, -0.01);
   group.add(post, frame, face);
-  let cur = -1;
-  // label size that fits the board, found once per stop while the ride loads (prefit): shrinking it inside show(),
-  // which runs when the car passes the middle of a hop, cost ~90 ms of measureText on a 4x-throttled CPU
-  const fitSize = new Map();
-  function labelSize(k) {
-    if (fitSize.has(k)) return fitSize.get(k);
-    const label = stops[k].label;
-    let fs = 120; x.font = `600 ${fs}px ${FONT_SIGN}`;
-    while (x.measureText(label).width > c.width - 250 && fs > 48) { fs -= 6; x.font = `600 ${fs}px ${FONT_SIGN}`; }
-    fitSize.set(k, fs);
-    return fs;
-  }
-  function show(k) {
-    if (k === cur) return; cur = k;
-    const s = stops[k], w = c.width, h = c.height;
-    const fs = labelSize(k);
+  const drawn = new Set();
+  function paint(k) {
+    if (drawn.has(k)) return false; drawn.add(k);
+    const c = texs[k].image, x = c.getContext('2d'), s = stops[k], w = c.width, h = c.height;
     x.fillStyle = '#0b1020'; x.fillRect(0, 0, w, h);
     x.fillStyle = '#6fe4ff'; x.fillRect(0, 0, w, 8);
     x.fillStyle = '#ffb347'; x.fillRect(34, 50, 132, 132);
     x.fillStyle = '#1b1003'; x.font = `600 84px ${FONT_SIGN}`; x.textAlign = 'center'; x.textBaseline = 'middle';
     x.fillText(String(k + 1).padStart(2, '0'), 100, 120);
     x.fillStyle = '#f3f7ff'; x.textAlign = 'left';
-    x.font = `600 ${fs}px ${FONT_SIGN}`;
-    x.fillText(s.label, 200, 122);
-    tex.needsUpdate = true;
+    let fs = 120; x.font = `600 ${fs}px ${FONT_SIGN}`;
+    const label = s.label;
+    while (x.measureText(label).width > w - 250 && fs > 48) { fs -= 6; x.font = `600 ${fs}px ${FONT_SIGN}`; }
+    x.fillText(label, 200, 122);
+    texs[k].needsUpdate = true;
+    return true;
   }
-  const prefit = () => { for (let k = 0; k < stops.length; k++) labelSize(k); };
-  return { group, show, prefit };
+  let cur = -1;
+  function show(k) {
+    if (k === cur) return; cur = k;
+    paint(k);                                  // normally painted (and uploaded) long before: see paintLater
+    faceMat.map = texs[k];
+  }
+  // paint(k) -> true when it drew now (then its texture wants an upload); painted(k): drawn already
+  return { group, show, paint, painted: (k) => drawn.has(k), textures: texs };
 }
 
 // ================================================================= fonts (canvas text needs them loaded)
@@ -1449,9 +1682,11 @@ function createHologram(stop, { frozen, reduced, texLoader, maxAniso, renderer, 
   const H = { stop, group, w: TW, h: TH, appear: 0, pickables: [frame], ready: Promise.resolve() };
   frame.userData.holo = H;
 
-  let mediaMesh = null, mediaMat = null, video = null, videoTex = null, videoOn = false, active = false;
+  let mediaMesh = null, mediaMat = null, video = null, videoTex = null, videoOn = false, active = false, dead = false;
+  const owned = [frameTex];          // textures this hologram created (freed in H.dispose)
   if (hasMedia) {
     const blank = new THREE.DataTexture(new Uint8Array([10, 20, 30, 255]), 1, 1); blank.needsUpdate = true;
+    owned.push(blank);
     mediaMat = mkMat(blank, true);
     mediaMesh = new THREE.Mesh(new THREE.PlaneGeometry(W, mediaH), mediaMat);
     mediaMesh.position.set(0, -TH / 2 + pad + mediaH / 2, 0.03);
@@ -1460,13 +1695,15 @@ function createHologram(stop, { frozen, reduced, texLoader, maxAniso, renderer, 
     group.add(mediaMesh); H.pickables.push(mediaMesh);
     const stillUrl = stop.mediaType === 'video' ? (stop.still || stop.poster) : stop.media;
     H.ready = loadTex(stillUrl, texLoader).then((t) => {
+      if (dead) { const img = t.image; t.dispose(); if (typeof ImageBitmap !== 'undefined' && img instanceof ImageBitmap) img.close(); return; }
+      owned.push(t);
       t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = Math.min(8, maxAniso);
       try { renderer.initTexture(t); } catch (e) { /* uploaded on first use */ }   // upload now, not in a frame
       if (!videoOn) mediaMat.uniforms.map.value = t;
     }).catch(() => {});
     if (stop.mediaType === 'video' && !frozen && !reduced) {   // reduced motion: keep the still
       H.startVideo = () => {
-        if (video) return;
+        if (video || dead) return;
         video = document.createElement('video');
         Object.assign(video, { muted: true, loop: true, playsInline: true, preload: 'auto' });
         video.setAttribute('muted', ''); video.setAttribute('playsinline', '');
@@ -1481,16 +1718,17 @@ function createHologram(stop, { frozen, reduced, texLoader, maxAniso, renderer, 
         // allocate + upload the video texture as soon as a frame is decoded (an event task, not a render frame);
         // swap it in once playback runs
         const makeTex = () => {
-          if (videoTex) return;
+          if (videoTex || dead) return;
           videoTex = new THREE.VideoTexture(video); videoTex.colorSpace = THREE.SRGBColorSpace;
+          owned.push(videoTex);
           videoTex.needsUpdate = true;
           try { renderer.initTexture(videoTex); } catch (e) { /* uploaded on first use */ }
         };
         // ... and that allocation + upload only while parked with the doors open: loadeddata arrives ~0.2 s after
         // the element was created, possibly after the visitor chose the next stop (then it waits for the next park)
-        const whenParked = (fn) => { if (!parked || parked()) fn(); else setTimeout(() => whenParked(fn), 250); };
+        const whenParked = (fn) => { if (dead) return; if (!parked || parked()) fn(); else setTimeout(() => whenParked(fn), 250); };
         const swapIn = () => {
-          if (videoOn) return;
+          if (videoOn || dead) return;
           makeTex(); videoOn = true;
           mediaMat.uniforms.map.value = videoTex;
         };
@@ -1509,14 +1747,24 @@ function createHologram(stop, { frozen, reduced, texLoader, maxAniso, renderer, 
   // parked with its doors open (prime), never in the middle of a hop. setActive then only plays / pauses.
   H.primed = () => !H.startVideo || !!video;
   H.prime = () => {
-    if (!H.startVideo || video) return;
+    if (!H.startVideo || video || dead) return;
     H.startVideo();
     if (active) video.play().catch(() => {});
   };
   H.setActive = (on) => {
-    if (on === active) return; active = on;
+    if (on === active || dead) return; active = on;
     if (!video) return;
     if (on) video.play().catch(() => {}); else video.pause();
+  };
+  // release the media: stop + unload the video (frees its decoder), free the textures and decoded images
+  H.dispose = () => {
+    if (dead) return; dead = true;
+    if (video) { video.pause(); video.removeAttribute('src'); try { video.load(); } catch (e) { /* detached */ } video.remove(); video = null; }
+    for (const t of owned) {
+      const img = t.image;
+      t.dispose();
+      if (img && typeof ImageBitmap !== 'undefined' && img instanceof ImageBitmap) img.close();
+    }
   };
   return H;
 }
